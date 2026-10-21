@@ -1,0 +1,55 @@
+/* ---------- статистика (окно использует .modal из styles.css) ---------- */
+
+.stats-modal {
+  width: min(720px, calc(100vw - 32px));
+}
+.stats-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stats-period > span:first-child {
+  min-width: 150px;
+}
+.stats-period input {
+  width: 92px;
+}
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.stats-table th,
+.stats-table td {
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.stats-table th:first-child,
+.stats-table td:first-child {
+  text-align: left;
+}
+.stats-table th {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.stats-table tbody tr:hover {
+  background: var(--bg-3);
+}
+.stats-table .stats-none td:first-child {
+  color: var(--muted);
+  font-style: italic;
+}
+.stats-table .stats-total td {
+  font-weight: 700;
+  border-top: 1px solid var(--line-2);
+  border-bottom: none;
+}
+.stats-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

@@ -1,0 +1,11 @@
+node_modules
+out
+dist
+*.log
+.omc/state
+# служебные папки oh-my-claudecode, если плагин создаст их не в корне
+**/.omc/state
+
+# служебные папки IDE и oh-my-claudecode
+.idea/
+.omc/

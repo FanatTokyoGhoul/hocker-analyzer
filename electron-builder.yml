@@ -1,0 +1,40 @@
+appId: com.ftg.hockeyanalyzer
+productName: Hockey Analyzer
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**
+  - package.json
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,*.d.ts,test,tests,__tests__,docs}'
+# Бинарники ffmpeg/ffprobe нельзя запускать изнутри asar
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+  - node_modules/ffprobe-static/**
+win:
+  target: nsis
+  files:
+    - '!node_modules/ffprobe-static/bin/{darwin,linux}/**'
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dmg
+  category: public.app-category.sports
+  files:
+    - '!node_modules/ffprobe-static/bin/{win32,linux}/**'
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Video
+  maintainer: ftg <nayzer322@gmail.com>
+  files:
+    - '!node_modules/ffprobe-static/bin/{darwin,win32}/**'
+# Закрываем запуск бинарника как node и отладку через аргументы командной строки
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
