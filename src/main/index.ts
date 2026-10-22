@@ -8,6 +8,7 @@ import { MEDIA_SCHEME, fromMediaUrl, serveFile, toMediaUrl } from './media'
 import { flushSettings, loadSettings, saveSettings, settingsPath, applyAuthorProfileDir } from './settings'
 import { cancelExport, registerExportIpc } from './exportIpc'
 import { sanitizeFileName } from './exportPlan'
+import { publishRemote, startRemote, stopRemote } from './remote'
 import { clearRecoverySync, readRecovery, writeRecovery } from './recovery'
 
 applyAuthorProfileDir()
@@ -118,6 +119,9 @@ function createWindow(): void {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  // перезагрузка или падение окна: интерфейс начнёт «с выключенным пультом» — сервер тоже выключаем
+  win.webContents.on('did-start-loading', () => stopRemote())
+  win.webContents.on('render-process-gone', () => stopRemote())
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -254,6 +258,17 @@ function registerIpc(): void {
     if (typeof path === 'string' && revealablePaths.has(resolve(path))) shell.showItemInFolder(path)
   })
 
+  // пульт с телефона: команды идут в рендерер, как нажатия клавиш; состояние — обратно на телефон
+  ipcMain.handle('remote:start', () =>
+    startRemote({
+      onCommand: (cmd) => win?.webContents.send('remote:command', cmd),
+      onStatus: (status) => win?.webContents.send('remote:status', status),
+      isAllowedMedia: (p) => allowedMedia.has(p)
+    })
+  )
+  ipcMain.handle('remote:stop', () => stopRemote())
+  ipcMain.on('remote:state', (_e, payload) => publishRemote(payload))
+
   ipcMain.handle('dialog:confirm', async (_e, message: string, detail?: string) => {
     const res = await dialog.showMessageBox(win!, {
       type: 'question',
@@ -302,6 +317,7 @@ app.on('before-quit', flushSettings)
 app.on('window-all-closed', () => {
   cancelConvert()
   cancelExport()
+  stopRemote()
   flushSettings()
   if (process.platform !== 'darwin') app.quit()
 })

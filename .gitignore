@@ -1,11 +1,27 @@
-node_modules
-out
-dist
-*.log
-.omc/state
-# служебные папки oh-my-claudecode, если плагин создаст их не в корне
-**/.omc/state
+# зависимости и сборка
+node_modules/
+out/
+dist/
+coverage/
+*.tsbuildinfo
 
-# служебные папки IDE и oh-my-claudecode
+# логи и временные файлы
+*.log
+npm-debug.log*
+*.tmp
+
+# локальные переменные окружения
+.env
+.env.*
+
+# документация по файлам — личные заметки, в репозиторий не идёт
+docs/
+
+# IDE, ОС и служебные папки инструментов
 .idea/
+.vscode/
+.claude/
 .omc/
+**/.omc/
+.DS_Store
+Thumbs.db

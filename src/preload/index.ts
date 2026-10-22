@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { ConvertProgress, ExportProgress, HockeyApi } from '../shared/types'
+import type { ConvertProgress, ExportProgress, HockeyApi, RemoteInfo } from '../shared/types'
+import type { RemoteCommand } from '../shared/remote'
 
 const api: HockeyApi = {
   openVideoDialog: () => ipcRenderer.invoke('video:open-dialog'),
@@ -31,7 +32,20 @@ const api: HockeyApi = {
     return () => ipcRenderer.removeListener('export:progress', listener)
   },
   saveTextFile: (suggestedName, content, ext) => ipcRenderer.invoke('file:save-text', suggestedName, content, ext),
-  revealFile: (path) => ipcRenderer.invoke('file:reveal', path)
+  revealFile: (path) => ipcRenderer.invoke('file:reveal', path),
+  startRemote: () => ipcRenderer.invoke('remote:start'),
+  stopRemote: () => ipcRenderer.invoke('remote:stop'),
+  publishRemoteState: (payload) => ipcRenderer.send('remote:state', payload),
+  onRemoteCommand: (cb) => {
+    const listener = (_e: unknown, cmd: RemoteCommand): void => cb(cmd)
+    ipcRenderer.on('remote:command', listener)
+    return () => ipcRenderer.removeListener('remote:command', listener)
+  },
+  onRemoteStatus: (cb) => {
+    const listener = (_e: unknown, info: RemoteInfo): void => cb(info)
+    ipcRenderer.on('remote:status', listener)
+    return () => ipcRenderer.removeListener('remote:status', listener)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -59,6 +59,17 @@ npm run dist:linux # .AppImage и .deb в dist/ (dist:win → .exe, dist:mac →
 | Рисунки в видео | каждый рисунок — стоп-кадр на заданное время (по умолчанию как остановка в плеере), затем видео продолжается. Подпись (название, теги) в начале клипа, схема площадки перед клипом — по выбору |
 | Прогресс и отмена | экспорт идёт в фоне, его можно отменить |
 
+### Пульт с телефона
+
+Телефон становится пультом: паузой, кадрами, моментами и рисованием на кадре. Нужна общая Wi-Fi сеть (или точка доступа, которую раздаёт ноутбук), интернет не нужен.
+
+| Функция | Как |
+|---|---|
+| Включить пульт | кнопка 📱 над видео → «Включить». Панель показывает QR-код и адрес |
+| Подключить телефон | отсканировать QR-код камерой. Страница открывается в браузере, ничего устанавливать не нужно |
+| Что умеет телефон | пауза, кадр и ±N мс, скорость, переключение видео, список моментов и «Проиграть все», I/O, быстрая разметка, отмена и повтор. На паузе можно рисовать: телефон получает кадр и рисует поверх него |
+| Безопасность | токен на каждое включение; пульт привязан к первому телефону («Новый код» снимает привязку); принимаются только запросы из локальной сети; команды проверяются; без подключений пульт выключается через 30 минут |
+
 ### Файлы и настройки
 
 | Функция | Как |
@@ -95,17 +106,20 @@ npm run dist:linux # .AppImage и .deb в dist/ (dist:win → .exe, dist:mac →
 src/
   shared/        типы (Project v2, Moment, Shape…), валидация JSON проекта и настроек
   main/          процесс Electron: окно, протокол media://, ffprobe/ffmpeg, IPC,
-                 экспорт клипов (export*.ts), черновик (recovery.ts), настройки
+                 экспорт клипов (export*.ts), черновик (recovery.ts), настройки,
+                 пульт с телефона (remote.ts, страница remote/page.html)
   preload/       contextBridge → window.api
   renderer/src/
     lib/         чистая логика, покрыта тестами: шаг кадра, редьюсер проекта с историей,
                  решение плейлиста, несколько видео (videos.ts), статистика и CSV (stats.ts),
                  сборка экспорта, отрисовка фигур и площадки (shapeRender.ts, rink.ts)
-    hooks/       useVideoClock (requestVideoFrameCallback), usePlaylist, useDrawingStops, useHotkeys
-    components/  VideoStage + DrawingLayer (konva), VideoBar, MomentsPanel, QuickTagsBar,
+    hooks/       useVideoClock (requestVideoFrameCallback), usePlaylist, useDrawingStops, useHotkeys,
+                 useVideoSources, useMoments, usePlayback, usePlayerHotkeys, useRemote (пульт)
+    components/  VideoStage + DrawingLayer (konva), VideoBar, MomentsPanel, QuickTagsBar, Toolbar,
+                 StageBanner, RemoteMenu (пульт),
                  диалоги на базе Modal: SettingsDialog, VideosDialog, BoardDialog, ExportDialog, StatsDialog
     styles/      стили окон, которые живут рядом с компонентами (stats.css)
-tests/e2e/       playwright-прогон собранного приложения (сценарии 1–20)
+tests/e2e/       playwright-прогон собранного приложения (сценарии 1–21)
 docs/            документация по каждому файлу, структура повторяет репозиторий (см. docs/README.md)
 ```
 

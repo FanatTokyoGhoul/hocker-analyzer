@@ -1,4 +1,5 @@
 import type { Settings } from './settings'
+import type { RemoteCommand, RemoteState } from './remote'
 
 /** Координаты фигур нормированы к кадру (0..1), чтобы не зависеть от размера окна. */
 export type ShapeKind = 'arrow' | 'line' | 'circle' | 'freehand' | 'zone' | 'spotlight' | 'text'
@@ -165,6 +166,25 @@ export type ExportResult = { paths: string[] }
 
 export type LoadedSettings = { settings: Settings; path: string }
 
+/** Адрес пульта: телефон открывает url (он же в QR-коде). */
+export type RemoteAddress = { ip: string; url: string; qrSvg: string }
+
+export type RemoteInfo = {
+  running: boolean
+  addresses: RemoteAddress[]
+  /** Сколько телефонов сейчас подключено. */
+  clients: number
+  /** Адрес устройства, к которому привязан пульт (первое открывшее страницу). */
+  device: string | null
+}
+
+/** Состояние для пульта + откуда main снимает кадр для рисования на телефоне. */
+export type RemotePublish = {
+  state: RemoteState
+  /** Видео и локальное время текущего кадра (середина кадра) — для снимка. */
+  frame: { videoPath: string; time: number } | null
+}
+
 export interface HockeyApi {
   openVideoDialog(): Promise<VideoInfo | null>
   probeVideo(path: string): Promise<VideoInfo>
@@ -193,4 +213,10 @@ export interface HockeyApi {
   /** Сохранить текст (CSV) через диалог; возвращает путь или null. */
   saveTextFile(suggestedName: string, content: string, ext: string): Promise<string | null>
   revealFile(path: string): Promise<void>
+  /** Пульт с телефона: запустить/остановить сервер в локальной сети. */
+  startRemote(): Promise<RemoteInfo>
+  stopRemote(): Promise<void>
+  publishRemoteState(payload: RemotePublish): void
+  onRemoteCommand(cb: (cmd: RemoteCommand) => void): () => void
+  onRemoteStatus(cb: (info: RemoteInfo) => void): () => void
 }

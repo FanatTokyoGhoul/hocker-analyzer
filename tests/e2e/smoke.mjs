@@ -145,21 +145,21 @@ try {
   step('стрелка и круг нарисованы, Ctrl+Z отменил круг')
 
   // 6b. меню рисования на полупрозрачной кнопке, любой цвет через HEX
-  await win.locator('.fab').click()
+  await win.getByRole('button', { name: 'Меню рисования' }).click()
   await win.getByRole('dialog', { name: 'Рисование' }).waitFor()
   await win.getByLabel('HEX-код цвета').fill('#12AB34')
   await win.getByLabel('HEX-код цвета').press('Enter')
   await win.getByRole('button', { name: /Линия/ }).click()
-  await win.locator('.fab').click()
+  await win.getByRole('button', { name: 'Меню рисования' }).click()
   await win.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.9)
   await win.mouse.down()
   await win.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.8, { steps: 5 })
   await win.mouse.up()
   await win.locator('.badge', { hasText: '✎ 2' }).waitFor()
-  await win.locator('.fab').click()
+  await win.getByRole('button', { name: 'Меню рисования' }).click()
   await win.getByLabel('Цвет #12ab34').waitFor() // попал в «недавние»
   await shot('02b-draw-menu')
-  await win.locator('.fab').click()
+  await win.getByRole('button', { name: 'Меню рисования' }).click()
   await win.keyboard.press('Escape')
   step('меню рисования: линия цветом #12ab34, цвет в «недавних»')
 
@@ -433,6 +433,60 @@ try {
   assert.equal(await win.locator('.moment').count(), countBefore)
   await waitFor(async () => (await video())?.ready >= 2, 'video after recovery')
   step('после аварийного завершения черновик восстановлен со всеми моментами')
+
+  // 21. пульт с телефона: QR-кнопка над видео, команды и рисование по HTTP
+  await win.getByRole('button', { name: 'Пульт с телефона' }).click()
+  await win.getByRole('button', { name: 'Включить' }).click()
+  await win.locator('.remote-qr').waitFor()
+  await shot('15-remote-qr')
+  const remoteUrl = new URL(await win.locator('.remote-url').innerText())
+  // телефон в той же сети — здесь ходим на тот же порт через localhost
+  const token = remoteUrl.searchParams.get('t')
+  const api = `http://127.0.0.1:${remoteUrl.port}`
+  assert.equal((await fetch(`${api}/?t=bad`)).status, 401)
+  assert.equal((await fetch(`${api}/?t=${token}`)).status, 200)
+  const command = (body) =>
+    fetch(`${api}/api/command`, { method: 'POST', headers: { 'X-Remote-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const events = await fetch(`${api}/api/events?t=${token}`)
+  const reader = events.body.getReader()
+  let sse = ''
+  while (!sse.includes('"ready":true')) sse += new TextDecoder().decode((await reader.read()).value)
+  await reader.cancel()
+  // пульт привязался к «телефону» (запросы шли с 127.0.0.1)
+  await win.locator('.remote-panel').getByText(/телефон 127\.0\.0\.1/).waitFor()
+  await seek(1.5)
+  assert.equal((await command({ type: 'togglePlay' })).status, 204)
+  await waitFor(async () => !(await video()).paused, 'remote play')
+  await command({ type: 'togglePlay' })
+  await waitFor(async () => (await video()).paused, 'remote pause')
+  // встаём внутрь момента на его видео (клик переключит видео, если нужно)
+  const potLabel = win.locator('.moment', { hasText: 'Потеря 1' })
+  await potLabel.click()
+  await waitFor(async () => (await video())?.ready >= 1, 'moment video')
+  for (let i = 0; i < 10; i++) await win.keyboard.press('ArrowRight')
+  await waitFor(async () => (await video())?.paused, 'paused in moment')
+  // фигура ляжет в активный момент (при пересечении — начавшийся позже), поэтому считаем все рисунки
+  const totalShapes = async () =>
+    (await win.locator('.moment .badge').allInnerTexts()).reduce((n, t) => n + Number(t.replace(/\D/g, '') || 0), 0)
+  const shapesBefore = await totalShapes()
+  // чужой кадр — отклоняется
+  await command({ type: 'addShape', frameKey: 'stale:0:0', shape: { id: 'old', kind: 'line', points: [0, 0, 1, 1], color: '#ffffff' } })
+  await new Promise((r) => setTimeout(r, 300))
+  assert.equal(await totalShapes(), shapesBefore)
+  // как телефон: снимок кадра → его ключ → фигура по этому ключу (состояние на сервере обновляется раз в ~120 мс,
+  // первый снимок может оказаться ещё от прошлого кадра — тогда компьютер его отклонит и повторим)
+  await waitFor(async () => {
+    const r = await fetch(`${api}/api/frame`, { headers: { 'X-Remote-Token': token } })
+    if (r.status !== 200 || r.headers.get('content-type') !== 'image/jpeg' || (await r.arrayBuffer()).byteLength < 1000) return false
+    const frameKey = decodeURIComponent(r.headers.get('x-frame-key'))
+    await command({ type: 'addShape', frameKey, shape: { id: 'phone1', kind: 'arrow', points: [0.2, 0.2, 0.6, 0.5], color: '#30d158' } })
+    await new Promise((res) => setTimeout(res, 300))
+    return (await totalShapes()) === shapesBefore + 1
+  }, 'shape from phone', 10000)
+  assert.equal((await command({ type: 'eval', code: 'x' })).status, 400)
+  await win.getByRole('button', { name: 'Выключить' }).click()
+  await waitFor(async () => (await fetch(`${api}/?t=${token}`).then((r) => r.status, () => 0)) !== 200, 'remote stopped')
+  step('пульт: QR-код над видео, токен, плей/пауза и стрелка с «телефона», снимок кадра, выключение')
 
   // 20. полный экран (последним: на некоторых мониторах после него окно перестаёт отрисовываться)
   await win.keyboard.press('KeyF')

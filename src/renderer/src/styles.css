@@ -11,6 +11,7 @@
   --accent-2: #60a5fa;
   --accent-soft: rgba(59, 130, 246, 0.16);
   --warn: #f5a524;
+  --ok: #30d158;
   --danger: #ef4444;
   --glass: rgba(18, 22, 28, 0.72);
   --radius: 8px;
@@ -330,15 +331,12 @@ kbd {
 
 /* ---------- плавающее меню рисования ---------- */
 
-.draw-menu {
-  position: absolute;
-  top: 14px;
-  right: 14px;
+.draw-menu,
+.remote-menu {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  z-index: 4;
 }
 .fab {
   position: relative;
@@ -359,7 +357,8 @@ kbd {
 }
 .fab:hover,
 .fab.is-open,
-.fab.is-drawing {
+.fab.is-drawing,
+.fab.is-active {
   opacity: 1;
 }
 .fab:hover {
@@ -606,10 +605,18 @@ kbd {
   font-weight: 600;
 }
 .btn-play {
-  width: 44px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   border-radius: 50%;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-play-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 .speed-slider {
   width: 100px;
@@ -643,13 +650,9 @@ kbd {
 .viewer.is-idle {
   cursor: none;
 }
-.viewer.is-idle .controls,
-.viewer.is-idle .draw-menu {
+.viewer.is-idle .controls {
   opacity: 0;
   pointer-events: none;
-}
-.draw-menu {
-  transition: opacity 0.25s;
 }
 
 /* ---------- панель моментов ---------- */
@@ -1258,7 +1261,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #4ade80;
+  color: var(--ok);
 }
 .export-error {
   flex-basis: 100%;
@@ -1267,4 +1270,62 @@ textarea:focus {
 .video-tabs {
   display: flex;
   gap: 2px;
+}
+
+/* плавающие кнопки над видео: рисование и пульт */
+.fab-stack {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 4;
+  transition: opacity 0.25s;
+}
+.fab-dot.is-ok {
+  background: var(--ok);
+}
+.fab-dot.is-wait {
+  background: var(--warn);
+}
+.viewer.is-idle .fab-stack {
+  opacity: 0;
+  pointer-events: none;
+}
+.remote-panel {
+  width: 280px;
+  text-align: center;
+}
+.remote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+.remote-qr {
+  display: block;
+  width: 220px;
+  height: 220px;
+  margin: 8px auto 0;
+  background: #fff;
+  border-radius: 8px;
+}
+.remote-url {
+  display: block;
+  font: 11px var(--mono);
+  color: var(--muted);
+  user-select: all;
+  word-break: break-all;
+}
+.remote-ip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+.warn-text {
+  color: var(--warn);
 }

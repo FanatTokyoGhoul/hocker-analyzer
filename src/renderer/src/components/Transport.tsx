@@ -26,7 +26,10 @@ export function Transport(p: Props): React.JSX.Element {
           ◀︎|
         </Btn>
         <Btn variant="primary" className="btn-play" onClick={p.onTogglePlay} title="Пауза / воспроизведение (Space)" aria-label={clock.paused ? 'Воспроизвести' : 'Пауза'}>
-          {clock.paused ? '▶' : '❚❚'}
+          {/* SVG вместо символов ▶ / ❚❚: у шрифтов разные отступы, и значок съезжал */}
+          <svg className="btn-play-icon" viewBox="0 0 16 16" aria-hidden="true">
+            {clock.paused ? <path d="M5 2.8v10.4a.6.6 0 0 0 .9.5l8.2-5.2a.6.6 0 0 0 0-1L5.9 2.3a.6.6 0 0 0-.9.5Z" /> : <path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z" />}
+          </svg>
         </Btn>
         <Btn variant="ghost" className="icon-btn" onClick={() => p.onStepFrame(1)} title="Кадр вперёд (→)" aria-label="Кадр вперёд">
           |▶︎
