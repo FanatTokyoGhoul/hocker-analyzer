@@ -99,5 +99,5 @@ export function useProjectFiles({ project, projectPath, dirty, dispatch, resetVi
     [notify]
   )
 
-  return { confirmDiscard, openLoadedProject, openVideo, dropVideo, openProject, saveProject, saveCsv }
+  return { confirmDiscard, startNewProject, openLoadedProject, openVideo, dropVideo, openProject, saveProject, saveCsv }
 }

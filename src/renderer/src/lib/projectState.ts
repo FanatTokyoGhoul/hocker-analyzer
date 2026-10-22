@@ -1,4 +1,4 @@
-import type { Moment, Project, ProjectVideo, Shape } from '../../../shared/types'
+import type { Board, Moment, Project, ProjectVideo, Shape } from '../../../shared/types'
 import { normalizePeriodStarts } from '../../../shared/project'
 
 type HistoryEntry = { project: Project; label: string }
@@ -31,8 +31,14 @@ export type ProjectAction =
   | ({ type: 'addShape'; shape: Shape } & ShapeTarget)
   | ({ type: 'undoShape' } & ShapeTarget)
   | ({ type: 'clearShapes' } & ShapeTarget)
+  /** Правка уже нарисованной фигуры — ищется по id во всех рисунках. */
+  | { type: 'updateShape'; shape: Shape }
+  | { type: 'deleteShape'; shapeId: string }
   | { type: 'setBoard'; momentId: string; shapes: Shape[] }
   | { type: 'setPeriods'; periods: number[] }
+  | { type: 'addBoard'; board: Board }
+  | { type: 'updateBoard'; id: string; patch: Partial<Omit<Board, 'id'>> }
+  | { type: 'removeBoard'; id: string }
   | { type: 'undo' }
   | { type: 'redo' }
 
@@ -48,8 +54,13 @@ const LABELS: Record<EditAction['type'], string> = {
   addShape: 'рисунок',
   undoShape: 'удаление фигуры',
   clearShapes: 'очистка кадра',
+  updateShape: 'изменение фигуры',
+  deleteShape: 'удаление фигуры',
   setBoard: 'схема площадки',
-  setPeriods: 'периоды'
+  setPeriods: 'периоды',
+  addBoard: 'новая схема',
+  updateBoard: 'схема',
+  removeBoard: 'удаление схемы'
 }
 
 export const initialProjectState: ProjectState = {
@@ -104,6 +115,27 @@ function editShapes(project: Project, m: Moment, t: ShapeTarget, fn: (shapes: Sh
     drawings.sort((a, b) => a.time - b.time)
   }
   return { ...m, drawings }
+}
+
+/** Заменяет или убирает фигуру по id во всех рисунках; опустевший рисунок удаляется. */
+function mapShapeById(project: Project, id: string, fn: (s: Shape) => Shape | null): Project {
+  let changed = false
+  const moments = project.moments.map((m) => {
+    if (!m.drawings?.some((d) => d.shapes.some((s) => s.id === id))) return m
+    const drawings = m.drawings
+      .map((d) => {
+        const i = d.shapes.findIndex((s) => s.id === id)
+        if (i < 0) return d
+        const next = fn(d.shapes[i])
+        if (next === d.shapes[i]) return d
+        changed = true
+        const shapes = next ? d.shapes.map((s, k) => (k === i ? next : s)) : d.shapes.filter((_, k) => k !== i)
+        return { ...d, shapes }
+      })
+      .filter((d) => d.shapes.length > 0)
+    return { ...m, drawings }
+  })
+  return changed ? { ...project, moments } : project
 }
 
 /** Применяет правку к проекту; возвращает тот же объект, если ничего не изменилось. */
@@ -172,6 +204,10 @@ function edit(project: Project, action: EditAction): Project {
       return mapMoments(project, action.momentId, (m) => editShapes(project, m, action, (s) => (s.length ? s.slice(0, -1) : s)))
     case 'clearShapes':
       return mapMoments(project, action.momentId, (m) => editShapes(project, m, action, (s) => (s.length ? [] : s)))
+    case 'updateShape':
+      return mapShapeById(project, action.shape.id, () => action.shape)
+    case 'deleteShape':
+      return mapShapeById(project, action.shapeId, () => null)
     case 'setBoard':
       return mapMoments(project, action.momentId, (m) => {
         if (m.board === action.shapes || (!m.board?.length && !action.shapes.length)) return m
@@ -179,6 +215,25 @@ function edit(project: Project, action: EditAction): Project {
         const { board: _removed, ...rest } = m
         return rest
       })
+    case 'addBoard':
+      return { ...project, boards: [...(project.boards ?? []), action.board] }
+    case 'updateBoard': {
+      let changed = false
+      const boards = (project.boards ?? []).map((b) => {
+        if (b.id !== action.id) return b
+        const next = { ...b, ...action.patch }
+        changed = next.title !== b.title || next.shapes !== b.shapes
+        return changed ? next : b
+      })
+      return changed ? { ...project, boards } : project
+    }
+    case 'removeBoard': {
+      const boards = (project.boards ?? []).filter((b) => b.id !== action.id)
+      if (boards.length === (project.boards ?? []).length) return project
+      if (boards.length) return { ...project, boards }
+      const { boards: _removed, ...rest } = project
+      return rest
+    }
     case 'setPeriods': {
       const periods = normalizePeriodStarts(action.periods)
       const current = project.periods ?? []

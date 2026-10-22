@@ -2,7 +2,7 @@
 // Системные диалоги подменяются в main-процессе, поэтому тест идёт без участия человека.
 import { _electron as electron } from 'playwright-core'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, existsSync, copyFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, existsSync, copyFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -487,6 +487,104 @@ try {
   await win.getByRole('button', { name: 'Выключить' }).click()
   await waitFor(async () => (await fetch(`${api}/?t=${token}`).then((r) => r.status, () => 0)) !== 200, 'remote stopped')
   step('пульт: QR-код над видео, токен, плей/пауза и стрелка с «телефона», снимок кадра, выключение')
+
+  // 22. правка фигур: нарисованный пас остаётся выделенным, конец тянется, «Правка» (V) выделяет, Delete удаляет
+  await win.keyboard.press('KeyP')
+  const lay = await win.locator('.drawing-layer').boundingBox()
+  const pt = (fx, fy) => [lay.x + lay.width * fx, lay.y + lay.height * fy]
+  const before22 = await totalShapes()
+  await drag(pt(0.15, 0.85), pt(0.35, 0.75))
+  await waitFor(async () => (await totalShapes()) === before22 + 1, 'pass drawn')
+  // тянем за конец — это правка, а не новая стрелка
+  await drag(pt(0.35, 0.75), pt(0.45, 0.6))
+  await new Promise((r) => setTimeout(r, 300))
+  assert.equal(await totalShapes(), before22 + 1)
+  await shot('16-edit-handles')
+  // Esc снимает выделение, инструмент остаётся
+  await win.keyboard.press('Escape')
+  assert.match(await win.locator('.drawing-layer').getAttribute('class'), /tool-pass/)
+  // Shift — новая стрелка прямо от конца выделенной (цепочка пас → движение)
+  await win.keyboard.press('KeyA')
+  await win.keyboard.down('Shift')
+  await drag(pt(0.45, 0.6), pt(0.6, 0.45))
+  await win.keyboard.up('Shift')
+  await waitFor(async () => (await totalShapes()) === before22 + 2, 'chained arrow from the tip')
+  await win.keyboard.press('Control+KeyZ')
+  await waitFor(async () => (await totalShapes()) === before22 + 1, 'chained arrow undone')
+  await win.keyboard.press('KeyV')
+  // середина передвинутой стрелки (0.15,0.85)–(0.45,0.6)
+  await win.mouse.click(...pt(0.3, 0.725))
+  await win.keyboard.press('Delete')
+  await waitFor(async () => (await totalShapes()) === before22, 'shape deleted')
+  await win.keyboard.press('Control+KeyZ')
+  await waitFor(async () => (await totalShapes()) === before22 + 1, 'delete undone')
+  await win.keyboard.press('Escape')
+  await win.keyboard.press('Escape')
+  step('правка фигур: пас выделен после рисования, конец тянется, V + клик + Delete, Ctrl+Z')
+
+  // 23. свободные схемы площадки — кнопка 📋 под рисованием и пультом
+  await win.getByRole('button', { name: 'Тактические схемы' }).click()
+  const boards = win.getByRole('dialog', { name: 'Тактические схемы' })
+  await boards.getByRole('button', { name: 'Создать схему' }).click()
+  const fb = await boards.locator('.board-frame').boundingBox()
+  await drag([fb.x + fb.width * 0.3, fb.y + fb.height * 0.5], [fb.x + fb.width * 0.7, fb.y + fb.height * 0.3])
+  await boards.getByLabel('Название схемы').fill('Выход из зоны')
+  await boards.getByLabel('Название схемы').press('Enter')
+  await boards.getByRole('button', { name: '＋ Схема' }).click()
+  await boards.getByRole('tab', { name: 'Схема 2' }).waitFor()
+  await shot('17-boards')
+  await boards.getByRole('button', { name: 'Готово' }).click()
+  await boards.waitFor({ state: 'detached' })
+  await stubDialogs(null, projectPath)
+  await win.keyboard.press('Control+KeyS')
+  await waitFor(() => {
+    try {
+      const b = JSON.parse(readFileSync(projectPath, 'utf8')).boards
+      return b?.length === 2 && b[0].title === 'Выход из зоны' && b[0].shapes.length === 1 && b
+    } catch {
+      return false
+    }
+  }, 'boards saved')
+  step('📋 тактические схемы: создать, нарисовать, переименовать, вторая схема, сохранено в проекте')
+
+  // 24. наведение на таймлайн: время и кадр над курсором, название момента
+  const scrub = await win.locator('.timeline-scrub').boundingBox()
+  await win.mouse.move(scrub.x + scrub.width * 0.5, scrub.y + scrub.height / 2)
+  await win.locator('.timeline-preview').waitFor()
+  assert.match(await win.locator('.timeline-preview-time').innerText(), /^\d+:\d\d\.\d{3}$/)
+  const lane = win.locator('.timeline-moment').first()
+  const lb = await lane.boundingBox()
+  await win.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2)
+  await win.locator('.timeline-preview-title').waitFor()
+  await shot('18-timeline-preview')
+  await win.mouse.move(scrub.x + scrub.width / 2, scrub.y - 200)
+  await win.locator('.timeline-preview').waitFor({ state: 'detached' })
+  step('наведение на таймлайн: время, кадр и название момента')
+
+  // 25. видео по ссылке VK (только с E2E_VK_URL: нужен интернет, первый раз скачивается yt-dlp)
+  const vkUrl = process.env.E2E_VK_URL
+  if (vkUrl) {
+    const vkDir = join(work, 'videos')
+    await app.evaluate(({ app: a }, dir) => a.setPath('videos', dir), vkDir)
+    await stubDialogs(null, null)
+    await win.getByRole('button', { name: 'Из VK' }).click()
+    const vk = win.getByRole('dialog', { name: 'Видео из VK' })
+    await vk.getByLabel('Ссылка на видео VK').fill('youtube.com/watch?v=1')
+    await vk.getByText('Нужна ссылка на видео').waitFor()
+    await vk.getByLabel('Ссылка на видео VK').fill(vkUrl)
+    await vk.getByRole('button', { name: 'Скачать и открыть' }).click()
+    await vk.locator('.progress').waitFor()
+    await shot('19-vk-progress')
+    await vk.waitFor({ state: 'detached', timeout: 600000 })
+    const opened = await waitFor(async () => {
+      const v = await video()
+      return v && v.ready >= 1 && v
+    }, 'vk video')
+    const saved = readdirSync(join(vkDir, 'Hockey Analyzer'))
+    assert.equal(saved.filter((f) => f.endsWith('.mp4')).length, 1, `в папке: ${saved}`)
+    assert.ok(opened.d > 0)
+    step(`VK: скачано и открыто (${saved[0]}, ${opened.d.toFixed(1)} с)`)
+  }
 
   // 20. полный экран (последним: на некоторых мониторах после него окно перестаёт отрисовываться)
   await win.keyboard.press('KeyF')

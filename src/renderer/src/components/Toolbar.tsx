@@ -11,6 +11,7 @@ type Props = {
   onUndo(): void
   onRedo(): void
   onOpenVideo(): void
+  onOpenVk(): void
   onOpenProject(): void
   onStats(): void
   onExport(): void
@@ -60,6 +61,9 @@ export function Toolbar(p: Props): React.JSX.Element {
       <div className="toolbar-actions">
         <Btn variant="ghost" onClick={p.onOpenVideo} title="Открыть видео матча">
           Открыть видео
+        </Btn>
+        <Btn variant="ghost" onClick={p.onOpenVk} title="Скачать видео из VK или VK Видео по ссылке">
+          Из VK
         </Btn>
         <Btn variant="ghost" onClick={p.onOpenProject} title="Открыть проект (Ctrl+O)">
           Открыть проект

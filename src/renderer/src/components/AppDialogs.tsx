@@ -5,12 +5,14 @@ import type { Exporter } from '../hooks/useExport'
 import type { ExportOptions, ExportScope } from '../lib/exportRequest'
 import type { ProjectAction } from '../lib/projectState'
 import { BoardDialog } from './BoardDialog'
+import { BoardsDialog } from './BoardsDialog'
+import { VkDialog } from './VkDialog'
 import { ExportDialog } from './ExportDialog'
 import { SettingsDialog } from './SettingsDialog'
 import { StatsDialog } from './StatsDialog'
 import { VideosDialog } from './VideosDialog'
 
-export type Dialog = { kind: 'settings' } | { kind: 'stats' } | { kind: 'export' } | { kind: 'videos' } | { kind: 'board'; momentId: string } | null
+export type Dialog = { kind: 'settings' } | { kind: 'stats' } | { kind: 'export' } | { kind: 'videos' } | { kind: 'board'; momentId: string } | { kind: 'boards' } | { kind: 'vk' } | null
 
 type Props = {
   dialog: Dialog
@@ -31,6 +33,8 @@ type Props = {
   /** Текущее время проекта — для начал периодов. */
   now: number
   onSaveCsv(name: string, content: string): void
+  confirmDiscard(): Promise<boolean>
+  onOpenDownloaded(v: VideoInfo): void
   exporter: Exporter
   exportCounts: Record<ExportScope, number>
   currentMoment: Moment | null
@@ -39,7 +43,7 @@ type Props = {
   onColor(color: string): void
 }
 
-/** Модальные окна приложения: настройки, статистика, экспорт, видео проекта, схема площадки. */
+/** Модальные окна приложения: настройки, статистика, экспорт, видео проекта, схема момента и свободные схемы. */
 export function AppDialogs(p: Props): React.JSX.Element | null {
   const { dialog, onClose, project, dispatch, settings } = p
   const moments = project?.moments ?? []
@@ -118,5 +122,20 @@ export function AppDialogs(p: Props): React.JSX.Element | null {
         />
       ) : null
     }
+    case 'vk':
+      return <VkDialog confirmDiscard={p.confirmDiscard} onOpened={p.onOpenDownloaded} onClose={onClose} />
+    case 'boards':
+      return (
+        <BoardsDialog
+          boards={project?.boards ?? []}
+          color={settings.color}
+          recentColors={settings.recentColors}
+          onColor={p.onColor}
+          onAdd={(board) => dispatch({ type: 'addBoard', board })}
+          onUpdate={(id, patch) => dispatch({ type: 'updateBoard', id, patch })}
+          onRemove={(id) => dispatch({ type: 'removeBoard', id })}
+          onClose={onClose}
+        />
+      )
   }
 }

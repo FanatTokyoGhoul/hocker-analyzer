@@ -1,4 +1,4 @@
-import type { Drawing, Moment, Project, ProjectVideo, Shape } from './types'
+import type { Board, Drawing, Moment, Project, ProjectVideo, Shape } from './types'
 
 export const PROJECT_VERSION = 2
 export const MAX_TEXT_LENGTH = 200
@@ -107,6 +107,26 @@ export function normalizePeriodStarts(periods: unknown): number[] {
   return [...new Set(periods.filter((p): p is number => isNum(p) && p > 0))].sort((a, b) => a - b)
 }
 
+export const MAX_BOARD_TITLE = 80
+/** Больше схем в проекте не бывает; чужой файл с тысячами схем не должен вешать открытие. */
+const MAX_BOARDS = 500
+
+/** Свободные схемы: битые отбрасываются, повторы id получают суффикс; пустая схема — тоже схема. */
+export function parseBoards(raw: unknown): Board[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const boards: Board[] = []
+  raw.slice(0, MAX_BOARDS).forEach((b, i) => {
+    if (!isObj(b)) return
+    let id = isStr(b.id) && b.id ? b.id.slice(0, 64) : `b${i + 1}`
+    if (seen.has(id)) id = `${id}_${i}`
+    seen.add(id)
+    const title = isStr(b.title) && b.title.trim() ? b.title.trim().slice(0, MAX_BOARD_TITLE) : `Схема ${boards.length + 1}`
+    boards.push({ id, title, shapes: parseShapes(b.shapes) })
+  })
+  return boards
+}
+
 /** Проверяет JSON проекта, отбрасывая битые фигуры; на критичных ошибках бросает исключение. */
 export function parseProject(raw: unknown): Project {
   if (!isObj(raw)) throw new Error('Файл проекта должен содержать JSON-объект')
@@ -122,6 +142,8 @@ export function parseProject(raw: unknown): Project {
   }
   const periods = normalizePeriodStarts(raw.periods)
   if (periods.length) project.periods = periods
+  const boards = parseBoards(raw.boards)
+  if (boards.length) project.boards = boards
   return project
 }
 

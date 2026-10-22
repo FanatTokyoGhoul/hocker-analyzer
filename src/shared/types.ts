@@ -1,5 +1,6 @@
 import type { Settings } from './settings'
 import type { RemoteCommand, RemoteState } from './remote'
+import type { DownloadProgress } from './vk'
 
 /** Координаты фигур нормированы к кадру (0..1), чтобы не зависеть от размера окна. */
 export type ShapeKind = 'arrow' | 'line' | 'circle' | 'freehand' | 'zone' | 'spotlight' | 'text'
@@ -82,6 +83,13 @@ export type ProjectVideo = {
   duration?: number
 }
 
+/** Тактическая схема, не привязанная к моменту; координаты нормированы к площадке, как у Moment.board. */
+export type Board = {
+  id: string
+  title: string
+  shapes: Shape[]
+}
+
 export type Project = {
   version?: number
   /** Путь первого видео — для совместимости с проектами v1. */
@@ -91,6 +99,8 @@ export type Project = {
   moments: Moment[]
   /** Время проекта, с которого начинаются 2-й, 3-й … периоды. */
   periods?: number[]
+  /** Свободные схемы площадки (кнопка 📋 над видео). */
+  boards?: Board[]
 }
 
 export type VideoInfo = {
@@ -192,6 +202,10 @@ export interface HockeyApi {
   convertVideo(path: string): Promise<VideoInfo>
   cancelConvert(): Promise<void>
   onConvertProgress(cb: (p: ConvertProgress) => void): () => void
+  /** Скачать видео VK по ссылке в «Видео/Hockey Analyzer» и открыть его. */
+  downloadVk(url: string): Promise<VideoInfo>
+  cancelVkDownload(): Promise<void>
+  onVkProgress(cb: (p: DownloadProgress) => void): () => void
   /** Добавить видео в проект (то же, что открыть, но без нового проекта). */
   addVideoDialog(): Promise<VideoInfo | null>
   openProjectDialog(): Promise<OpenedProject | null>

@@ -11,6 +11,8 @@ type Props = {
   tool: Tool
   color: string
   onAddShape(shape: Shape): void
+  onUpdateShape(shape: Shape): void
+  onDeleteShape(id: string): void
   onDrawStart(): void
   onDropFile(file: File): void
   onVideoError(): void
@@ -25,7 +27,7 @@ type Props = {
 }
 
 export function VideoStage(props: Props): React.JSX.Element {
-  const { info, videoRef, shapes, canDraw, tool, color, onAddShape, onDrawStart, onDropFile, onVideoError, onClickVideo, hint, overlay, floating, empty, zoom, onZoom } = props
+  const { info, videoRef, shapes, canDraw, tool, color, onAddShape, onUpdateShape, onDeleteShape, onDrawStart, onDropFile, onVideoError, onClickVideo, hint, overlay, floating, empty, zoom, onZoom } = props
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ width: 0, height: 0 })
   const [dragOver, setDragOver] = useState(false)
@@ -129,6 +131,8 @@ export function VideoStage(props: Props): React.JSX.Element {
               tool={tool}
               color={color}
               onAdd={onAddShape}
+              onUpdate={onUpdateShape}
+              onDelete={onDeleteShape}
               onDrawStart={onDrawStart}
             />
           )}

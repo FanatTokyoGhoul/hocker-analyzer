@@ -3,7 +3,8 @@ import { readFile, rename, stat, unlink, writeFile } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import type { OpenedProject, Project, Recovery, VideoInfo } from '../shared/types'
 import { parseProject, serializeProject } from '../shared/project'
-import { cancelConvert, convert, convertedPathFor, probe } from './ffmpeg'
+import { FFMPEG, cancelConvert, convert, convertedPathFor, probe } from './ffmpeg'
+import { cancelVkDownload, downloadVk, removeStaleTemp } from './vkDownload'
 import { MEDIA_SCHEME, fromMediaUrl, serveFile, toMediaUrl } from './media'
 import { flushSettings, loadSettings, saveSettings, settingsPath, applyAuthorProfileDir } from './settings'
 import { cancelExport, registerExportIpc } from './exportIpc'
@@ -120,8 +121,13 @@ function createWindow(): void {
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   // перезагрузка или падение окна: интерфейс начнёт «с выключенным пультом» — сервер тоже выключаем
-  win.webContents.on('did-start-loading', () => stopRemote())
-  win.webContents.on('render-process-gone', () => stopRemote())
+  // окно перезагрузилось или упало — пульт и скачивание больше некому показывать
+  const stopBackground = (): void => {
+    stopRemote()
+    cancelVkDownload()
+  }
+  win.webContents.on('did-start-loading', stopBackground)
+  win.webContents.on('render-process-gone', stopBackground)
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -179,6 +185,17 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('video:cancel-convert', () => cancelConvert())
+
+  // ссылка проверяется в downloadVk: только видео VK, скачивание в «Видео/Hockey Analyzer»
+  ipcMain.handle('vk:download', async (e, url: unknown) => {
+    if (typeof url !== 'string') throw new Error('Нужна ссылка на видео VK')
+    const path = await downloadVk(url, FFMPEG, (p) => {
+      if (!e.sender.isDestroyed()) e.sender.send('vk:progress', p)
+    })
+    revealablePaths.add(resolve(path))
+    return describeVideo(path)
+  })
+  ipcMain.handle('vk:cancel', () => cancelVkDownload())
 
   ipcMain.handle('project:open-dialog', async (): Promise<OpenedProject | null> => {
     const res = await dialog.showOpenDialog(win!, {
@@ -296,6 +313,8 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
+  // хвосты скачиваний из VK, оборванных падением приложения
+  void removeStaleTemp().catch(() => undefined)
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const filePath = resolve(fromMediaUrl(request.url))
     if (!allowedMedia.has(filePath)) return new Response('Forbidden', { status: 403 })
@@ -317,6 +336,7 @@ app.on('before-quit', flushSettings)
 app.on('window-all-closed', () => {
   cancelConvert()
   cancelExport()
+  cancelVkDownload()
   stopRemote()
   flushSettings()
   if (process.platform !== 'darwin') app.quit()

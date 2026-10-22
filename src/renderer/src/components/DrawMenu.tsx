@@ -4,6 +4,7 @@ import { Btn } from './Btn'
 import { CommitField } from './CommitField'
 
 export const TOOLS: { id: Exclude<Tool, 'none'>; icon: string; label: string; key: string; code: string; hint: string }[] = [
+  { id: 'select', icon: '↖', label: 'Правка', key: 'V', code: 'KeyV', hint: 'выделить фигуру, двигать, тянуть за концы' },
   { id: 'arrow', icon: '➚', label: 'Движение', key: 'A', code: 'KeyA', hint: 'сплошная стрелка' },
   { id: 'pass', icon: '⇢', label: 'Пас', key: 'P', code: 'KeyP', hint: 'пунктирная стрелка' },
   { id: 'line', icon: '╱', label: 'Линия', key: 'L', code: 'KeyL', hint: 'прямая' },
@@ -97,6 +98,11 @@ export function DrawMenu(p: Props): React.JSX.Element {
             </label>
             <CommitField className="mono hex-input" label="HEX-код цвета" spellCheck={false} value={p.color} parse={normalizeHex} onCommit={p.onColor} />
           </div>
+
+          <p className="muted small draw-note">
+            Нарисованная фигура остаётся выделенной: тяните за концы, Delete — удалить, Esc — снять выделение. Shift — начать новую фигуру прямо от
+            конца выделенной. «Правка» (V) выделяет любую фигуру: двигать, тянуть, перекрасить.
+          </p>
 
           <div className="draw-actions">
             <Btn onClick={p.onUndo} disabled={!p.canEdit || p.shapeCount === 0} title="Убрать последнюю фигуру на кадре">

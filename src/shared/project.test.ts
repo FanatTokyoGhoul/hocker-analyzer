@@ -91,4 +91,30 @@ describe('parseProject', () => {
     expect(again).toEqual(p)
     expect(JSON.parse(serializeProject(p))).toMatchObject({ videoPath: '/p1.mp4', fps: 25, version: 2 })
   })
+
+  it('читает свободные схемы: битые отбрасывает, повторы id и пустые названия исправляет', () => {
+    const p = parseProject({
+      videoPath: '/a.mp4',
+      moments: [],
+      boards: [
+        { id: 'b', title: ' Выход ', shapes: [{ id: 's', kind: 'arrow', points: [0, 0, 1, 1], color: '#fff' }, { kind: 'bad' }] },
+        { id: 'b', title: '', shapes: 'x' },
+        'мусор'
+      ]
+    })
+    expect(p.boards).toEqual([
+      { id: 'b', title: 'Выход', shapes: [{ id: 's', kind: 'arrow', points: [0, 0, 1, 1], color: '#fff' }] },
+      { id: 'b_1', title: 'Схема 2', shapes: [] }
+    ])
+    expect(parseProject(JSON.parse(serializeProject(p))).boards).toEqual(p.boards)
+    expect('boards' in parseProject({ videoPath: '/a.mp4', moments: [] })).toBe(false)
+  })
+
+  it('ограничивает число схем и длину id', () => {
+    const boards = Array.from({ length: 600 }, () => ({ id: 'x'.repeat(100), title: 't', shapes: [] }))
+    const p = parseProject({ videoPath: '/a.mp4', moments: [], boards })
+    expect(p.boards).toHaveLength(500)
+    expect(new Set(p.boards!.map((b) => b.id)).size).toBe(500)
+    expect(p.boards![0].id).toHaveLength(64)
+  })
 })

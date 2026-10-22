@@ -66,5 +66,23 @@ export function useFrameDrawing({ project, moments, dispatch, time, paused, fps,
     if (momentId) dispatch({ type: 'clearShapes', momentId, time: frameTime, videoId, tolerance: halfFrame })
   }, [momentId, frameTime, videoId, halfFrame, dispatch])
 
-  return { frame, activeMoment, canDraw, hint, shapes, shapeCount, addShape, undoShape, clearShapes }
+  // правка и удаление — только видимых на этом кадре фигур и только когда рисовать можно
+  const updateShape = useCallback(
+    (shape: Shape) => {
+      const before = shapes.find((s) => s.id === shape.id)
+      if (!canDraw || !before) return
+      dispatch({ type: 'updateShape', shape })
+      // перекрасили — цвет в «недавние», как у новой фигуры
+      if (before.color !== shape.color) onColorUsed(shape.color)
+    },
+    [canDraw, shapes, dispatch, onColorUsed]
+  )
+  const deleteShape = useCallback(
+    (id: string) => {
+      if (canDraw && shapes.some((s) => s.id === id)) dispatch({ type: 'deleteShape', shapeId: id })
+    },
+    [canDraw, shapes, dispatch]
+  )
+
+  return { frame, activeMoment, canDraw, hint, shapes, shapeCount, addShape, updateShape, deleteShape, undoShape, clearShapes }
 }

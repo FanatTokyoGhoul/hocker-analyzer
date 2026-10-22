@@ -187,3 +187,37 @@ describe('вспомогательные функции', () => {
     expect(collectTags([moment('a', 0, 1, { tags: ['я', 'а'] }), moment('b', 0, 1, { tags: ['а'] })])).toEqual(['а', 'я'])
   })
 })
+
+describe('правка фигур и свободные схемы', () => {
+  const target = { momentId: 'm', time: 1.02, videoId: 'v1', tolerance: 0.02 }
+
+  it('updateShape меняет фигуру по id в любом рисунке, deleteShape убирает её и пустой рисунок', () => {
+    let s = base()
+    s = projectReducer(s, { type: 'addMoment', moment: moment('m', 0, 5) })
+    s = projectReducer(s, { type: 'addShape', ...target, shape: arrow('s1') })
+    s = projectReducer(s, { type: 'addShape', ...target, time: 2.02, shape: arrow('s2') })
+    s = projectReducer(s, { type: 'updateShape', shape: { ...arrow('s2'), color: '#00f' } })
+    expect(s.project!.moments[0].drawings![1].shapes[0].color).toBe('#00f')
+    expect(undoLabel(s)).toBe('изменение фигуры')
+    s = projectReducer(s, { type: 'deleteShape', shapeId: 's1' })
+    expect(s.project!.moments[0].drawings!.map((d) => d.time)).toEqual([2.02])
+    expect(undoLabel(s)).toBe('удаление фигуры')
+    // неизвестная фигура — ничего не меняется и в историю не попадает
+    const same = projectReducer(s, { type: 'deleteShape', shapeId: 'nope' })
+    expect(same).toBe(s)
+    s = projectReducer(s, { type: 'undo' })
+    expect(s.project!.moments[0].drawings!.length).toBe(2)
+  })
+
+  it('добавляет, переименовывает и удаляет схемы; последняя удалённая убирает поле', () => {
+    let s = base()
+    s = projectReducer(s, { type: 'addBoard', board: { id: 'b1', title: 'Схема 1', shapes: [] } })
+    s = projectReducer(s, { type: 'updateBoard', id: 'b1', patch: { title: 'Выход из зоны', shapes: [arrow('x')] } })
+    expect(s.project!.boards).toEqual([{ id: 'b1', title: 'Выход из зоны', shapes: [arrow('x')] }])
+    expect(projectReducer(s, { type: 'updateBoard', id: 'b1', patch: { title: 'Выход из зоны' } })).toBe(s)
+    s = projectReducer(s, { type: 'removeBoard', id: 'b1' })
+    expect('boards' in s.project!).toBe(false)
+    s = projectReducer(s, { type: 'undo' })
+    expect(s.project!.boards![0].title).toBe('Выход из зоны')
+  })
+})

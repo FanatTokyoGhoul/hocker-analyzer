@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 
 export type HotkeyHandler = (e: KeyboardEvent) => boolean | void
 
-const isTyping = (target: EventTarget | null): boolean =>
+/** Фокус в поле ввода: буквы — текст, а не горячие клавиши. */
+export const isTyping = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) &&
   !(target instanceof HTMLInputElement && ['checkbox', 'radio', 'range', 'button'].includes(target.type))

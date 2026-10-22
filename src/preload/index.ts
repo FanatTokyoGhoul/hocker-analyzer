@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { ConvertProgress, ExportProgress, HockeyApi, RemoteInfo } from '../shared/types'
 import type { RemoteCommand } from '../shared/remote'
+import type { DownloadProgress } from '../shared/vk'
 
 const api: HockeyApi = {
   openVideoDialog: () => ipcRenderer.invoke('video:open-dialog'),
@@ -12,6 +13,13 @@ const api: HockeyApi = {
     const listener = (_e: unknown, p: ConvertProgress): void => cb(p)
     ipcRenderer.on('video:convert-progress', listener)
     return () => ipcRenderer.removeListener('video:convert-progress', listener)
+  },
+  downloadVk: (url) => ipcRenderer.invoke('vk:download', url),
+  cancelVkDownload: () => ipcRenderer.invoke('vk:cancel'),
+  onVkProgress: (cb) => {
+    const listener = (_e: unknown, p: DownloadProgress): void => cb(p)
+    ipcRenderer.on('vk:progress', listener)
+    return () => ipcRenderer.removeListener('vk:progress', listener)
   },
   addVideoDialog: () => ipcRenderer.invoke('video:add-dialog'),
   openProjectDialog: () => ipcRenderer.invoke('project:open-dialog'),

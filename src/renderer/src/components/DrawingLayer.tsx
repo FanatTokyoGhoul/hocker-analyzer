@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layer, Stage } from 'react-konva'
-import type Konva from 'konva'
+import Konva from 'konva'
 import type { Shape, ZoneShape } from '../../../shared/types'
 import { MAX_TEXT_LENGTH } from '../../../shared/project'
 import { newId } from '../lib/ids'
 import { buildRink } from '../lib/rink'
 import { createShapeNode, fillDim, fillMain, textSizeFor } from '../lib/shapeRender'
+import { isTyping } from '../hooks/useHotkeys'
+import { HANDLE_RADIUS, boundsOf, dragHandle, handleAt, handlesOf, moveShape, sameShape, shapeAt } from '../lib/shapeEdit'
 
-export type Tool = 'none' | 'arrow' | 'pass' | 'line' | 'circle' | 'spotlight' | 'zone' | 'text' | 'freehand'
+/** select — правка готовых фигур: выделить, перетащить, потянуть за ручки. */
+export type Tool = 'none' | 'select' | 'arrow' | 'pass' | 'line' | 'circle' | 'spotlight' | 'zone' | 'text' | 'freehand'
 
 type Props = {
   width: number
@@ -17,6 +20,9 @@ type Props = {
   tool: Tool
   color: string
   onAdd(shape: Shape): void
+  /** Правка и удаление готовых фигур; без них фигуры только добавляются. */
+  onUpdate?(shape: Shape): void
+  onDelete?(id: string): void
   onDrawStart?(): void
   /** Фон под фигурами — схема площадки. */
   background?: 'rink'
@@ -37,9 +43,28 @@ function zoneVertices(points: number[], w: number, h: number): number[] {
   return out
 }
 
-/** Canvas-слой поверх видео (или схемы): показывает фигуры и даёт рисовать новые. */
-export function DrawingLayer({ width, height, shapes, editable, tool, color, onAdd, onDrawStart, background }: Props): React.JSX.Element {
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
+/** Сдвиг, при котором хотя бы краешек фигуры (5% кадра) остаётся в кадре. */
+function clampMove(b: { x: number; y: number; w: number; h: number }, dx: number, dy: number): [number, number] {
+  const keep = 0.05
+  return [Math.min(1 - keep - b.x, Math.max(keep - b.x - b.w, dx)), Math.min(1 - keep - b.y, Math.max(keep - b.y - b.h, dy))]
+}
+
+/** Идёт перетаскивание: исходная фигура, текущая и ручка (null — двигаем целиком). */
+type Edit = { orig: Shape; shape: Shape; handle: string | null; from: [number, number] }
+
+/**
+ * Canvas-слой поверх видео (или схемы): показывает фигуры и даёт рисовать новые.
+ * Только что нарисованная фигура остаётся выделенной: её концы можно сразу поправить, Delete — удалить;
+ * с Shift новая фигура начинается даже на ручке. Инструмент «Правка» выделяет любую фигуру, двигает её,
+ * а выбор цвета в нём перекрашивает выделенную. Выделение снимают Esc или клик мимо.
+ */
+export function DrawingLayer({ width, height, shapes, editable, tool, color, onAdd, onUpdate, onDelete, onDrawStart, background }: Props): React.JSX.Element {
   const [draft, setDraft] = useState<Shape | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [edit, setEdit] = useState<Edit | null>(null)
+  const stageRef = useRef<Konva.Stage>(null)
+  const editLayer = useRef<Konva.Layer>(null)
   const [textAt, setTextAt] = useState<{ x: number; y: number } | null>(null)
   const [text, setText] = useState('')
   const bgLayer = useRef<Konva.Layer>(null)
@@ -47,6 +72,12 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
   const mainLayer = useRef<Konva.Layer>(null)
   const draftLayer = useRef<Konva.Layer>(null)
   const drawing = editable && tool !== 'none'
+  const canEdit = drawing && !!onUpdate
+  const size = { width, height }
+  // во время перетаскивания показываем фигуру в новом положении, в проект она попадает по отпусканию
+  const shown = useMemo(() => (edit ? shapes.map((s) => (s.id === edit.shape.id ? edit.shape : s)) : shapes), [shapes, edit])
+  // фигура могла исчезнуть (отмена, другой кадр) — тогда и выделения нет
+  const selected = canEdit && selectedId ? (shown.find((s) => s.id === selectedId) ?? null) : null
   /** Сохранить набранную подпись (определена ниже; через ref — для эффектов). */
   const commitTextRef = useRef<() => void>(() => undefined)
 
@@ -56,16 +87,28 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     commitTextRef.current()
     setDraft(null)
     setTextAt(null)
+    setEdit(null)
   }, [drawing, tool])
+  // рисовать перестали (пуск, другой кадр без момента, закрыли меню) — выделение снимаем
+  useEffect(() => {
+    if (!drawing) setSelectedId(null)
+    // курсор «тянуть/двигать» ставится вручную — возвращаем обычный
+    const container = stageRef.current?.container()
+    if (container) container.style.cursor = ''
+  }, [drawing, tool])
+  // фигуры больше нет на кадре (другой кадр, отмена) — забываем выделение, чтобы оно не вернулось само
+  useEffect(() => {
+    if (selectedId && !edit && !shapes.some((s) => s.id === selectedId)) setSelectedId(null)
+  }, [selectedId, edit, shapes])
   // окно схемы закрыли с открытым полем подписи
   useEffect(() => () => commitTextRef.current(), [])
 
   // готовые фигуры перерисовываем только при их изменении, незаконченную — в отдельном слое на каждом движении
   useEffect(() => {
-    if (mainLayer.current) fillMain(mainLayer.current, shapes, width, height)
-  }, [shapes, width, height])
+    if (mainLayer.current) fillMain(mainLayer.current, shown, width, height)
+  }, [shown, width, height])
   const spotDraft = draft?.kind === 'spotlight' ? draft : null
-  const dimShapes = useMemo(() => (spotDraft ? [...shapes, spotDraft] : shapes), [shapes, spotDraft])
+  const dimShapes = useMemo(() => (spotDraft ? [...shown, spotDraft] : shown), [shown, spotDraft])
   useEffect(() => {
     if (dimLayer.current) fillDim(dimLayer.current, dimShapes, width, height)
   }, [dimShapes, width, height])
@@ -76,6 +119,72 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     if (draft) layer.add(createShapeNode(draft, width, height, { draft: draft.kind === 'zone' }))
     layer.batchDraw()
   }, [draft, width, height])
+
+  // рамка и ручки выделенной фигуры
+  useEffect(() => {
+    const layer = editLayer.current
+    if (!layer) return
+    layer.destroyChildren()
+    if (selected) {
+      const b = boundsOf(selected, { width, height })
+      const pad = 6
+      layer.add(
+        new Konva.Rect({
+          x: b.x * width - pad,
+          y: b.y * height - pad,
+          width: b.w * width + pad * 2,
+          height: b.h * height + pad * 2,
+          stroke: '#ffffff',
+          strokeWidth: 1,
+          dash: [4, 4],
+          opacity: 0.8
+        })
+      )
+      for (const hd of handlesOf(selected)) {
+        layer.add(new Konva.Circle({ x: hd.x * width, y: hd.y * height, radius: HANDLE_RADIUS, fill: '#ffffff', stroke: selected.color, strokeWidth: 2 }))
+      }
+    }
+    layer.batchDraw()
+  }, [selected, width, height])
+
+  /** Поверх открыто модальное окно (например, схема), а этот слой под ним: клавиши и цвет — не для него. */
+  const covered = (): boolean => {
+    const modals = document.querySelectorAll('[aria-modal="true"]')
+    const host = stageRef.current?.container()
+    const top = modals[modals.length - 1]
+    return !!top && !!host && !top.contains(host)
+  }
+
+  // Delete — удалить выделенную, Esc — снять выделение (раньше, чем Esc выключит инструмент или закроет окно)
+  const selectedKey = selected?.id ?? null
+  useEffect(() => {
+    if (!selectedKey) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (isTyping(e.target) || covered()) return
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        e.stopPropagation()
+        onDelete?.(selectedKey)
+        setSelectedId(null)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setSelectedId(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [selectedKey, onDelete])
+
+  // в «Правке» выбранный цвет перекрашивает выделенную фигуру; с инструментом рисования цвет —
+  // для следующей фигуры, а не для только что нарисованной
+  const lastColor = useRef(color)
+  useEffect(() => {
+    if (lastColor.current === color) return
+    lastColor.current = color
+    if (tool === 'select' && selected && !edit && selected.color !== color && !covered()) onUpdate?.({ ...selected, color })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- реагируем только на смену цвета
+  }, [color])
 
   useEffect(() => {
     const layer = bgLayer.current
@@ -90,9 +199,15 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     return pos ? [pos.x / width, pos.y / height] : null
   }
 
+  /** Добавить новую фигуру и оставить её выделенной — чтобы сразу поправить. */
+  const add = (shape: Shape): void => {
+    onAdd(shape)
+    if (onUpdate) setSelectedId(shape.id)
+  }
+
   const commitZone = (z: ZoneShape): void => {
     const points = zoneVertices(z.points.slice(0, -2), width, height)
-    if (points.length >= 6) onAdd({ ...z, points })
+    if (points.length >= 6) add({ ...z, points })
     setDraft(null)
   }
 
@@ -103,7 +218,7 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     if (!textOpen.current) return
     textOpen.current = false
     const value = text.trim()
-    if (textAt && value) onAdd({ id: newId('s'), kind: 'text', x: textAt.x, y: textAt.y, text: value, color })
+    if (textAt && value) add({ id: newId('s'), kind: 'text', x: textAt.x, y: textAt.y, text: value, color })
     setTextAt(null)
     setText('')
   }
@@ -114,6 +229,27 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     const p = pointer(e)
     if (!p) return
     const [x, y] = p
+    if (canEdit && !textAt && draft?.kind !== 'zone') {
+      // ручки выделенной фигуры важнее нового рисунка: конец стрелки можно сразу подвинуть.
+      // С Shift — всегда новая фигура: следующую стрелку можно начать прямо от конца предыдущей
+      const handle = selected && !(e.evt.shiftKey && tool !== 'select') ? handleAt(selected, x, y, size) : null
+      if (selected && handle) {
+        onDrawStart?.()
+        setEdit({ orig: selected, shape: selected, handle, from: [x, y] })
+        return
+      }
+      if (tool === 'select') {
+        const hit = shapeAt(shown, x, y, size)
+        setSelectedId(hit?.id ?? null)
+        if (hit) {
+          onDrawStart?.()
+          setEdit({ orig: hit, shape: hit, handle: null, from: [x, y] })
+        }
+        return
+      }
+      setSelectedId(null)
+    }
+    if (tool === 'select') return
     onDrawStart?.()
     if (tool === 'text') {
       // поле появляется сразу (React успевает отрисовать его до всплытия события): дальше событие
@@ -144,10 +280,27 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
   }
 
   const onMove = (e: Konva.KonvaEventObject<PointerEvent>): void => {
-    if (!draft) return
     const p = pointer(e)
     if (!p) return
     const [x, y] = p
+    if (edit) {
+      // фигура не уезжает за край кадра: иначе её уже не выделить
+      const shape = edit.handle
+        ? dragHandle(edit.orig, edit.handle, clamp01(x), clamp01(y), size)
+        : moveShape(edit.orig, ...clampMove(boundsOf(edit.orig, size), x - edit.from[0], y - edit.from[1]))
+      setEdit({ ...edit, shape })
+      return
+    }
+    if (!draft) {
+      // подсказка курсором: ручку можно тянуть, фигуру в режиме правки — двигать
+      const container = e.target.getStage()?.container()
+      if (container && canEdit) {
+        const overHandle = selected && handleAt(selected, x, y, size)
+        const overShape = tool === 'select' && shapeAt(shown, x, y, size)
+        container.style.cursor = overHandle ? 'grab' : overShape ? 'move' : ''
+      }
+      return
+    }
     if (draft.kind === 'circle' || draft.kind === 'spotlight') {
       // радиус в пикселях, чтобы круг оставался кругом при любом соотношении сторон
       const r = Math.hypot((x - draft.x) * width, (y - draft.y) * height)
@@ -165,13 +318,18 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
   }
 
   const onUp = (): void => {
+    if (edit) {
+      if (!sameShape(edit.orig, edit.shape)) onUpdate?.(edit.shape)
+      setEdit(null)
+      return
+    }
     // зона рисуется кликами, а не протягиванием
     if (!draft || draft.kind === 'zone') return
     let big = false
     if (draft.kind === 'circle' || draft.kind === 'spotlight') big = draft.rx > MIN_SIZE
     else if (draft.kind === 'freehand') big = draft.points.length >= 6
     else if (draft.kind === 'arrow' || draft.kind === 'line') big = Math.hypot(draft.points[2] - draft.points[0], draft.points[3] - draft.points[1]) > MIN_SIZE
-    if (big) onAdd(draft)
+    if (big) add(draft)
     setDraft(null)
   }
 
@@ -179,6 +337,7 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
   return (
     <>
       <Stage
+        ref={stageRef}
         width={width}
         height={height}
         className={`drawing-layer${drawing ? ` is-drawing tool-${tool}` : ''}`}
@@ -200,6 +359,7 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
         <Layer ref={dimLayer} listening={false} />
         <Layer ref={mainLayer} listening={false} />
         <Layer ref={draftLayer} listening={false} />
+        <Layer ref={editLayer} listening={false} />
       </Stage>
       {draft?.kind === 'zone' && <div className="stage-hint stage-hint-top">Кликайте вершины зоны; замкнуть — клик по первой точке или двойной клик</div>}
       {textAt && (

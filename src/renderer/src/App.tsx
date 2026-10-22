@@ -9,6 +9,7 @@ import type { Tool } from './components/DrawingLayer'
 import { HoldOverlay } from './components/HoldOverlay'
 import { MomentsPanel } from './components/MomentsPanel'
 import { RemoteMenu } from './components/RemoteMenu'
+import { BoardsButton } from './components/BoardsButton'
 import { StageBanner } from './components/StageBanner'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
@@ -317,7 +318,7 @@ export default function App(): React.JSX.Element {
   // ---------- горячие клавиши ----------
 
   usePlayerHotkeys({
-    dialog: dialog ? (dialog.kind === 'board' ? 'board' : 'other') : null,
+    dialog: dialog ? (dialog.kind === 'board' || dialog.kind === 'boards' ? 'board' : 'other') : null,
     waitingKey: hold?.mode === 'key',
     ready: !!info,
     release: continueHold,
@@ -359,6 +360,7 @@ export default function App(): React.JSX.Element {
         onUndo={undo}
         onRedo={redo}
         onOpenVideo={files.openVideo}
+        onOpenVk={() => setDialog({ kind: 'vk' })}
         onOpenProject={files.openProject}
         onStats={() => setDialog({ kind: 'stats' })}
         onExport={() => {
@@ -390,6 +392,8 @@ export default function App(): React.JSX.Element {
             tool={tool}
             color={color}
             onAddShape={drawing.addShape}
+            onUpdateShape={drawing.updateShape}
+            onDeleteShape={drawing.deleteShape}
             onDrawStart={freeze}
             onDropFile={files.dropVideo}
             onVideoError={sources.reportPlaybackError}
@@ -432,6 +436,13 @@ export default function App(): React.JSX.Element {
                     onClear={drawing.clearShapes}
                   />
                   <RemoteMenu remote={remote} open={menu === 'remote'} onOpenChange={(open) => setMenu(open ? 'remote' : null)} />
+                  <BoardsButton
+                    count={project?.boards?.length ?? 0}
+                    onOpen={() => {
+                      setMenu(null)
+                      setDialog({ kind: 'boards' })
+                    }}
+                  />
                 </div>
                 {playingMoment && (
                   <div className="moment-caption" aria-live="polite">
@@ -453,6 +464,9 @@ export default function App(): React.JSX.Element {
                     <Btn variant="primary" onClick={files.openVideo}>
                       Открыть видео
                     </Btn>
+                    <Btn onClick={() => setDialog({ kind: 'vk' })} title="Скачать видео из VK или VK Видео по ссылке">
+                      По ссылке VK
+                    </Btn>
                     <Btn onClick={files.openProject}>Открыть проект</Btn>
                   </div>
                   <p className="muted small">Горячие клавиши — в настройках ⚙</p>
@@ -467,6 +481,7 @@ export default function App(): React.JSX.Element {
               moments={timelineMoments}
               draft={timelineDraft}
               activeId={activeMoment?.id ?? null}
+              src={info?.url ?? null}
               onSeek={seek}
               onSelectMoment={selectTimelineMoment}
             />
@@ -532,6 +547,11 @@ export default function App(): React.JSX.Element {
             onRemoveVideo={sources.removeVideo}
             now={clock.time + offset}
             onSaveCsv={files.saveCsv}
+            confirmDiscard={files.confirmDiscard}
+            onOpenDownloaded={(v) => {
+              files.startNewProject(v)
+              notify(`Скачано в «Видео/Hockey Analyzer»: ${fileName(v.path)}`)
+            }}
             exporter={exporter}
             exportCounts={exportCounts}
             currentMoment={activeMoment}
