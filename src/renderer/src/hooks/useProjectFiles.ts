@@ -15,10 +15,12 @@ type Options = {
   loadProject(p: Project, path: string | null, missingVideos: string[], restored: boolean): void
   projectForDisk(p: Project): Project
   notify(msg: string): void
+  /** Имя сохранённого файла по пути (на телефоне путь — content://…). */
+  nameOf?(path: string): string
 }
 
 /** Открытие видео и проектов, сохранение проекта и CSV — с подтверждением потери несохранённого. */
-export function useProjectFiles({ project, projectPath, dirty, dispatch, resetView, startProject, loadProject, projectForDisk, notify }: Options) {
+export function useProjectFiles({ project, projectPath, dirty, dispatch, resetView, startProject, loadProject, projectForDisk, notify, nameOf = fileName }: Options) {
   const confirmDiscard = useCallback(
     async () => !dirty || window.api.confirm('Несохранённые изменения будут потеряны', 'Продолжить без сохранения?'),
     [dirty]
@@ -78,13 +80,13 @@ export function useProjectFiles({ project, projectPath, dirty, dispatch, resetVi
         const path = await window.api.saveProject(saveAs ? null : projectPath, projectForDisk(project))
         if (path) {
           dispatch({ type: 'saved', path, project })
-          notify(`Сохранено: ${fileName(path)}`)
+          notify(`Сохранено: ${nameOf(path)}`)
         }
       } catch (e) {
         notify(`Не удалось сохранить: ${errorText(e)}`)
       }
     },
-    [project, projectPath, projectForDisk, dispatch, notify]
+    [project, projectPath, projectForDisk, dispatch, notify, nameOf]
   )
 
   const saveCsv = useCallback(

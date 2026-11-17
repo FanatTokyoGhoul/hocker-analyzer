@@ -14,6 +14,10 @@ type Props = {
   vfrDismissed: boolean
   onConvert(): void
   onDismissVfr(): void
+  /** Перекодирование доступно (на телефоне ffmpeg нет). */
+  canConvert?: boolean
+  /** Имя файла по пути (на телефоне путь — content://…). */
+  nameOf?(path: string): string
 }
 
 /** Плашка внизу видео — самое важное из: черновик, конвертация, ненайденное видео, неподдерживаемый формат, VFR. */
@@ -23,7 +27,7 @@ export function StageBanner(p: Props): React.JSX.Element | null {
     return (
       <div className="banner banner-warn" role="alert">
         <span>
-          Найдена несохранённая работа: {fileName(r.projectPath ?? r.project.videoPath)}, {new Date(r.savedAt).toLocaleString('ru')} · моментов:{' '}
+          Найдена несохранённая работа: {(p.nameOf ?? fileName)(r.projectPath ?? r.project.videoPath)}, {new Date(r.savedAt).toLocaleString('ru')} · моментов:{' '}
           {r.project.moments.length}
         </span>
         <Btn variant="primary" onClick={p.onRestore}>
@@ -49,7 +53,7 @@ export function StageBanner(p: Props): React.JSX.Element | null {
     return (
       <div className="banner banner-warn">
         <span>
-          Видео «{v.label}» не найдено: {v.path}
+          Видео «{v.label}» не найдено: {p.nameOf ? p.nameOf(v.path) : v.path}
         </span>
         <Btn variant="primary" onClick={() => p.onRelocate(v.id)}>
           Указать видео
@@ -58,6 +62,13 @@ export function StageBanner(p: Props): React.JSX.Element | null {
     )
   }
   const info = p.info
+  if (info && p.canConvert === false) {
+    return p.playbackError ? (
+      <div className="banner banner-warn">
+        <span>Телефон не может воспроизвести этот файл. Перекодируйте его на компьютере или выберите другое видео.</span>
+      </div>
+    ) : null
+  }
   if (info && (info.needsConversion || p.playbackError)) {
     return (
       <div className="banner banner-warn">

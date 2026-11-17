@@ -2,6 +2,7 @@ import { useCallback, useMemo, type Dispatch } from 'react'
 import type { Moment, Project, Shape } from '../../../shared/types'
 import { drawingVideoId, findDrawingIndex, momentAt, type ProjectAction } from '../lib/projectState'
 import { frameIndex } from '../lib/time'
+import { COARSE_POINTER } from '../lib/touch'
 
 type Options = {
   project: Project | null
@@ -34,7 +35,8 @@ export function useFrameDrawing({ project, moments, dispatch, time, paused, fps,
   let hint: string | null = null
   if (ready) {
     if (!paused) hint = 'Поставьте видео на паузу, чтобы рисовать'
-    else if (!activeMoment) hint = 'Рисунок привязывается к моменту — перейдите внутрь момента или создайте его (I / O)'
+    else if (!activeMoment)
+      hint = `Рисунок привязывается к моменту — перейдите внутрь момента или создайте его (${COARSE_POINTER ? 'кнопкой быстрой разметки' : 'I / O'})`
   }
 
   const shapes = useMemo(

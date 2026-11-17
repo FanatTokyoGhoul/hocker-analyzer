@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Hold } from '../hooks/useDrawingStops'
+import { COARSE_POINTER } from '../lib/touch'
 import { Btn } from './Btn'
 
 /** Плашка «остановка на рисунке»: обратный отсчёт или подсказка нажать клавишу. */
@@ -16,7 +17,7 @@ export function HoldOverlay({ hold, onContinue }: { hold: Hold; onContinue(): vo
     <div className="hold" role="status" aria-label="Пауза на рисунке" onPointerDown={(e) => e.stopPropagation()}>
       <span className="hold-icon" aria-hidden="true">✎</span>
       <span aria-hidden={left !== null}>
-        {left === null ? 'Пауза на рисунке — нажмите любую клавишу, чтобы продолжить' : `Пауза на рисунке · продолжение через ${left.toFixed(1)} с`}
+        {left === null ? (COARSE_POINTER ? 'Пауза на рисунке' : 'Пауза на рисунке — нажмите любую клавишу, чтобы продолжить') : `Пауза на рисунке · продолжение через ${left.toFixed(1)} с`}
       </span>
       <Btn variant="primary" onClick={onContinue}>
         Продолжить

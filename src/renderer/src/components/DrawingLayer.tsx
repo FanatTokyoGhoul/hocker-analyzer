@@ -8,6 +8,7 @@ import { buildRink } from '../lib/rink'
 import { createShapeNode, fillDim, fillMain, textSizeFor } from '../lib/shapeRender'
 import { isTyping } from '../hooks/useHotkeys'
 import { HANDLE_RADIUS, boundsOf, dragHandle, handleAt, handlesOf, moveShape, sameShape, shapeAt } from '../lib/shapeEdit'
+import { COARSE_POINTER, TOUCH_HANDLE_SLOP, TOUCH_HIT_SLOP } from '../lib/touch'
 
 /** select — правка готовых фигур: выделить, перетащить, потянуть за ручки. */
 export type Tool = 'none' | 'select' | 'arrow' | 'pass' | 'line' | 'circle' | 'spotlight' | 'zone' | 'text' | 'freehand'
@@ -29,8 +30,10 @@ type Props = {
 }
 
 const MIN_SIZE = 0.004
-/** Клик ближе этого (px) к первой вершине замыкает зону. */
-const CLOSE_RADIUS = 12
+/** Клик ближе этого (px) к первой вершине замыкает зону; пальцем попасть труднее. */
+const CLOSE_RADIUS = COARSE_POINTER ? 24 : 12
+/** Ручки выделенной фигуры: под палец — крупнее. */
+const HANDLE_DRAW_RADIUS = COARSE_POINTER ? 11 : HANDLE_RADIUS
 
 /** Вершины зоны без «хвоста» за курсором и без повторов (двойной клик ставит две одинаковые). */
 function zoneVertices(points: number[], w: number, h: number): number[] {
@@ -141,7 +144,7 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
         })
       )
       for (const hd of handlesOf(selected)) {
-        layer.add(new Konva.Circle({ x: hd.x * width, y: hd.y * height, radius: HANDLE_RADIUS, fill: '#ffffff', stroke: selected.color, strokeWidth: 2 }))
+        layer.add(new Konva.Circle({ x: hd.x * width, y: hd.y * height, radius: HANDLE_DRAW_RADIUS, fill: '#ffffff', stroke: selected.color, strokeWidth: 2 }))
       }
     }
     layer.batchDraw()
@@ -232,14 +235,15 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     if (canEdit && !textAt && draft?.kind !== 'zone') {
       // ручки выделенной фигуры важнее нового рисунка: конец стрелки можно сразу подвинуть.
       // С Shift — всегда новая фигура: следующую стрелку можно начать прямо от конца предыдущей
-      const handle = selected && !(e.evt.shiftKey && tool !== 'select') ? handleAt(selected, x, y, size) : null
+      const touch = e.evt.pointerType === 'touch'
+      const handle = selected && !(e.evt.shiftKey && tool !== 'select') ? handleAt(selected, x, y, size, touch ? TOUCH_HANDLE_SLOP : undefined) : null
       if (selected && handle) {
         onDrawStart?.()
         setEdit({ orig: selected, shape: selected, handle, from: [x, y] })
         return
       }
       if (tool === 'select') {
-        const hit = shapeAt(shown, x, y, size)
+        const hit = shapeAt(shown, x, y, size, touch ? TOUCH_HIT_SLOP : undefined)
         setSelectedId(hit?.id ?? null)
         if (hit) {
           onDrawStart?.()
@@ -333,6 +337,19 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
     setDraft(null)
   }
 
+  // Konva считает двойным кликом два любых клика подряд, даже в разных местах, —
+  // замыкаем зону, только если две последние вершины совпали (настоящий двойной клик или тап)
+  const closeZoneOnDouble = (): void => {
+    if (draft?.kind !== 'zone') return
+    const p = draft.points.slice(0, -2)
+    const n = p.length
+    const near = COARSE_POINTER ? 16 : 6
+    if (n >= 8 && Math.hypot((p[n - 2] - p[n - 4]) * width, (p[n - 1] - p[n - 3]) * height) < near) commitZone(draft)
+  }
+
+  // на телефоне нет клавиши Delete: у выделенной фигуры появляется кнопка «удалить»
+  const deleteBox = COARSE_POINTER && selected && !edit && onDelete ? boundsOf(selected, size) : null
+
   const fontSize = textSizeFor(height)
   return (
     <>
@@ -346,14 +363,8 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
-        onDblClick={() => {
-          // Konva считает двойным кликом два любых клика подряд, даже в разных местах, —
-          // замыкаем зону, только если две последние вершины совпали (настоящий двойной клик)
-          if (draft?.kind !== 'zone') return
-          const p = draft.points.slice(0, -2)
-          const n = p.length
-          if (n >= 8 && Math.hypot((p[n - 2] - p[n - 4]) * width, (p[n - 1] - p[n - 3]) * height) < 6) commitZone(draft)
-        }}
+        onDblClick={closeZoneOnDouble}
+        onDblTap={closeZoneOnDouble}
       >
         <Layer ref={bgLayer} listening={false} />
         <Layer ref={dimLayer} listening={false} />
@@ -361,7 +372,26 @@ export function DrawingLayer({ width, height, shapes, editable, tool, color, onA
         <Layer ref={draftLayer} listening={false} />
         <Layer ref={editLayer} listening={false} />
       </Stage>
-      {draft?.kind === 'zone' && <div className="stage-hint stage-hint-top">Кликайте вершины зоны; замкнуть — клик по первой точке или двойной клик</div>}
+      {draft?.kind === 'zone' && (
+        <div className="stage-hint stage-hint-top">
+          {COARSE_POINTER ? 'Ставьте вершины зоны; замкнуть — тап по первой точке' : 'Кликайте вершины зоны; замкнуть — клик по первой точке или двойной клик'}
+        </div>
+      )}
+      {deleteBox && selected && (
+        <button
+          type="button"
+          className="shape-delete"
+          aria-label="Удалить фигуру"
+          style={{ left: Math.min(width - 36, Math.max(0, (deleteBox.x + deleteBox.w) * width - 4)), top: Math.max(0, deleteBox.y * height - 40) }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => {
+            onDelete?.(selected.id)
+            setSelectedId(null)
+          }}
+        >
+          🗑
+        </button>
+      )}
       {textAt && (
         <input
           // новое место — новое поле: autoFocus срабатывает только при монтировании

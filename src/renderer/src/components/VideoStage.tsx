@@ -50,6 +50,26 @@ export function VideoStage(props: Props): React.JSX.Element {
   const pan = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
   const drawingActive = canDraw && tool !== 'none'
+  // увеличение двумя пальцами (когда не рисуем): между событиями React может не успеть перерисовать —
+  // последнее значение зума держим в ref
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const touches = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ dist: number; x: number; y: number } | null>(null)
+  const pinchState = (): { dist: number; x: number; y: number } => {
+    const [a, b] = [...touches.current.values()]
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  }
+  const dropTouch = (id: number): void => {
+    touches.current.delete(id)
+    // любой поднятый палец заканчивает щипок: иначе следующая пара считается от старой и зум прыгает
+    pinch.current = null
+  }
+  // кадр сменился посреди касания (переключили видео) — старые пальцы не должны превращать тап в щипок
+  useEffect(() => {
+    touches.current.clear()
+    pinch.current = null
+  }, [info])
   const onWheel = (e: React.WheelEvent<HTMLDivElement>): void => {
     if (size.width <= 0) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -83,11 +103,42 @@ export function VideoStage(props: Props): React.JSX.Element {
           onWheel={onWheel}
           onPointerDown={(e) => {
             suppressClick.current = false
+            if (e.pointerType === 'touch' && !drawingActive) {
+              touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+              // захват — только для щипка: захваченный одиночный тап не дойдёт до <video> кликом (пауза)
+              if (touches.current.size === 2) {
+                for (const id of touches.current.keys()) {
+                  if (e.currentTarget.hasPointerCapture(id)) continue
+                  try {
+                    e.currentTarget.setPointerCapture(id)
+                  } catch {
+                    // палец уже отпустили
+                  }
+                }
+                pan.current = null
+                pinch.current = pinchState()
+                return
+              }
+            }
             if (zoom.z <= 1 || !(e.button === 1 || (e.button === 0 && !drawingActive))) return
             e.currentTarget.setPointerCapture(e.pointerId)
             pan.current = { x: e.clientX, y: e.clientY, moved: false }
           }}
           onPointerMove={(e) => {
+            if (pinch.current && touches.current.has(e.pointerId)) {
+              touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+              const prev = pinch.current
+              const next = pinchState()
+              const rect = e.currentTarget.getBoundingClientRect()
+              if (prev.dist > 0 && rect.width > 0) {
+                const zoomed = zoomAt(zoomRef.current, next.dist / prev.dist, (next.x - rect.left) / rect.width, (next.y - rect.top) / rect.height)
+                zoomRef.current = panBy(zoomed, (next.x - prev.x) / rect.width, (next.y - prev.y) / rect.height)
+                onZoom(zoomRef.current)
+              }
+              pinch.current = next
+              suppressClick.current = true
+              return
+            }
             const p = pan.current
             if (!p || size.width <= 0) return
             const dx = e.clientX - p.x
@@ -98,11 +149,15 @@ export function VideoStage(props: Props): React.JSX.Element {
             p.y = e.clientY
             onZoom(panBy(zoom, dx / size.width, dy / size.height))
           }}
-          onPointerUp={() => {
-            suppressClick.current = !!pan.current?.moved
+          onPointerUp={(e) => {
+            const pinched = touches.current.size >= 2
+            dropTouch(e.pointerId)
+            suppressClick.current = pinched || suppressClick.current || !!pan.current?.moved
             pan.current = null
           }}
-          onPointerCancel={() => {
+          onLostPointerCapture={(e) => dropTouch(e.pointerId)}
+          onPointerCancel={(e) => {
+            dropTouch(e.pointerId)
             pan.current = null
             suppressClick.current = false
           }}

@@ -52,14 +52,14 @@ export function textBox(shape: Extract<Shape, { kind: 'text' }>, s: Size): { x: 
   return { x: shape.x, y: shape.y, w: width / s.width, h: height / s.height }
 }
 
-/** Попадает ли точка (нормированная) в фигуру: по линии — с допуском, по площади — внутрь. */
-export function hitsShape(shape: Shape, x: number, y: number, s: Size): boolean {
+/** Попадает ли точка (нормированная) в фигуру: по линии — с допуском slop (px), по площади — внутрь. */
+export function hitsShape(shape: Shape, x: number, y: number, s: Size, slop = HIT_RADIUS): boolean {
   const p = px(x, y, s)
   switch (shape.kind) {
     case 'arrow':
     case 'line': {
       const [x1, y1, x2, y2] = shape.points
-      return distToSegment(p, px(x1, y1, s), px(x2, y2, s)) <= HIT_RADIUS
+      return distToSegment(p, px(x1, y1, s), px(x2, y2, s)) <= slop
     }
     case 'circle':
     case 'spotlight': {
@@ -69,12 +69,12 @@ export function hitsShape(shape: Shape, x: number, y: number, s: Size): boolean 
       const dy = p[1] - shape.y * s.height
       // внутри круга или рядом с его контуром
       const k = Math.hypot(dx / rx, dy / ry)
-      return k <= 1 || (k - 1) * Math.min(rx, ry) <= HIT_RADIUS
+      return k <= 1 || (k - 1) * Math.min(rx, ry) <= slop
     }
     case 'freehand':
-      return distToPolyline(p, shape.points, s, false) <= HIT_RADIUS
+      return distToPolyline(p, shape.points, s, false) <= slop
     case 'zone':
-      return insidePolygon(x, y, shape.points) || distToPolyline(p, shape.points, s, true) <= HIT_RADIUS
+      return insidePolygon(x, y, shape.points) || distToPolyline(p, shape.points, s, true) <= slop
     case 'text': {
       const b = textBox(shape, s)
       return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h
@@ -83,8 +83,8 @@ export function hitsShape(shape: Shape, x: number, y: number, s: Size): boolean 
 }
 
 /** Верхняя (нарисованная последней) фигура под точкой. */
-export function shapeAt(shapes: Shape[], x: number, y: number, s: Size): Shape | null {
-  for (let i = shapes.length - 1; i >= 0; i--) if (hitsShape(shapes[i], x, y, s)) return shapes[i]
+export function shapeAt(shapes: Shape[], x: number, y: number, s: Size, slop = HIT_RADIUS): Shape | null {
+  for (let i = shapes.length - 1; i >= 0; i--) if (hitsShape(shapes[i], x, y, s, slop)) return shapes[i]
   return null
 }
 
@@ -107,11 +107,11 @@ export function handlesOf(shape: Shape): Handle[] {
   }
 }
 
-export function handleAt(shape: Shape, x: number, y: number, s: Size): string | null {
+export function handleAt(shape: Shape, x: number, y: number, s: Size, slop = HANDLE_RADIUS + 3): string | null {
   const p = px(x, y, s)
   for (const h of handlesOf(shape)) {
     const [hx, hy] = px(h.x, h.y, s)
-    if (Math.hypot(p[0] - hx, p[1] - hy) <= HANDLE_RADIUS + 3) return h.id
+    if (Math.hypot(p[0] - hx, p[1] - hy) <= slop) return h.id
   }
   return null
 }

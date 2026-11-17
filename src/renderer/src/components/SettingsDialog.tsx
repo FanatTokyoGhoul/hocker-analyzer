@@ -14,6 +14,8 @@ type Props = {
   onChange(patch: Partial<Settings>): void
   onOptimize(): void
   onClose(): void
+  /** Телефон: без перекодирования и справки по клавишам. */
+  mobile?: boolean
 }
 
 const HOLD_MODES: { id: HoldMode; label: string }[] = [
@@ -113,13 +115,13 @@ function QuickTagsEditor({ tags, onChange }: { tags: QuickTag[]; onChange(tags: 
 }
 
 /** Настройки, которые обычно задаются один раз. Сохраняются автоматически. */
-export function SettingsDialog({ settings, settingsFile, info, canOptimize, onChange, onOptimize, onClose }: Props): React.JSX.Element {
+export function SettingsDialog({ settings, settingsFile, info, canOptimize, onChange, onOptimize, onClose, mobile }: Props): React.JSX.Element {
   return (
     <Modal title="Настройки" onClose={onClose}>
       <section className="settings-section">
         <h3>Воспроизведение</h3>
         <label className="setting">
-          <span>Шаг N для Shift + ← / →</span>
+          <span>{mobile ? 'Шаг кнопок ±N' : 'Шаг N для Shift + ← / →'}</span>
           <span className="setting-input">
             <CommitField
               type="number"
@@ -138,7 +140,7 @@ export function SettingsDialog({ settings, settingsFile, info, canOptimize, onCh
       <section className="settings-section">
         <h3>Кнопки быстрой разметки</h3>
         <p className="muted small">
-          Нажатие кнопки (или Shift + цифра) сразу создаёт момент «за N секунд до — через M секунд после» текущего времени с нужным тегом.
+          {mobile ? 'Нажатие кнопки' : 'Нажатие кнопки (или Shift + цифра)'} сразу создаёт момент «за N секунд до — через M секунд после» текущего времени с нужным тегом.
         </p>
         <QuickTagsEditor tags={settings.quickTags} onChange={(quickTags) => onChange({ quickTags })} />
       </section>
@@ -205,30 +207,32 @@ export function SettingsDialog({ settings, settingsFile, info, canOptimize, onCh
         </p>
       </section>
 
-      <section className="settings-section">
-        <h3>Видео</h3>
-        {info ? (
-          <>
-            <p className="muted small">
-              {info.width}×{info.height} · {info.videoCodec.toUpperCase()} · {info.fps.toFixed(info.fps % 1 ? 2 : 0)} fps
-              {info.variableFrameRate ? ' (переменная)' : ''} · {formatTime(info.duration, false)}
-            </p>
-            <div className="setting">
-              <span>
-                Оптимизировать для перемотки
-                <span className="muted small block">
-                  Перекодировать в H.264 с ключевым кадром каждые 10 кадров и постоянным fps — точнее покадровый шаг.
+      {!mobile && (
+        <section className="settings-section">
+          <h3>Видео</h3>
+          {info ? (
+            <>
+              <p className="muted small">
+                {info.width}×{info.height} · {info.videoCodec.toUpperCase()} · {info.fps.toFixed(info.fps % 1 ? 2 : 0)} fps
+                {info.variableFrameRate ? ' (переменная)' : ''} · {formatTime(info.duration, false)}
+              </p>
+              <div className="setting">
+                <span>
+                  Оптимизировать для перемотки
+                  <span className="muted small block">
+                    Перекодировать в H.264 с ключевым кадром каждые 10 кадров и постоянным fps — точнее покадровый шаг.
+                  </span>
                 </span>
-              </span>
-              <Btn onClick={onOptimize} disabled={!canOptimize}>
-                Перекодировать
-              </Btn>
-            </div>
-          </>
-        ) : (
-          <p className="muted small">Видео не открыто.</p>
-        )}
-      </section>
+                <Btn onClick={onOptimize} disabled={!canOptimize}>
+                  Перекодировать
+                </Btn>
+              </div>
+            </>
+          ) : (
+            <p className="muted small">Видео не открыто.</p>
+          )}
+        </section>
+      )}
 
       {settingsFile && (
         <section className="settings-section">
@@ -243,19 +247,21 @@ export function SettingsDialog({ settings, settingsFile, info, canOptimize, onCh
         </section>
       )}
 
-      <section className="settings-section">
-        <h3>Горячие клавиши</h3>
-        <dl className="keymap">
-          {KEYS.map(([k, v]) => (
-            <div key={k}>
-              <dt>
-                <kbd>{k}</kbd>
-              </dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {!mobile && (
+        <section className="settings-section">
+          <h3>Горячие клавиши</h3>
+          <dl className="keymap">
+            {KEYS.map(([k, v]) => (
+              <div key={k}>
+                <dt>
+                  <kbd>{k}</kbd>
+                </dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
     </Modal>
   )
 }

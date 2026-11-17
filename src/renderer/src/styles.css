@@ -85,9 +85,11 @@ input:disabled {
     border-color 0.12s,
     color 0.12s;
 }
+@media (hover: hover) {
 .btn:hover:not(:disabled) {
   background: var(--bg-4);
   border-color: var(--line-2);
+}
 }
 .btn:disabled {
   opacity: 0.4;
@@ -103,9 +105,11 @@ input:disabled {
   border-color: var(--accent);
   color: #fff;
 }
+@media (hover: hover) {
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-2);
   border-color: var(--accent-2);
+}
 }
 .btn-danger {
   background: var(--danger);
@@ -116,9 +120,11 @@ input:disabled {
   background: transparent;
   border-color: transparent;
 }
+@media (hover: hover) {
 .btn-ghost:hover:not(:disabled) {
   background: var(--bg-3);
   border-color: transparent;
+}
 }
 .icon-btn {
   min-width: 32px;
@@ -355,14 +361,20 @@ kbd {
     background 0.15s,
     transform 0.15s;
 }
-.fab:hover,
 .fab.is-open,
 .fab.is-drawing,
 .fab.is-active {
   opacity: 1;
 }
+@media (hover: hover) {
+.fab:hover {
+  opacity: 1;
+}
+}
+@media (hover: hover) {
 .fab:hover {
   transform: scale(1.05);
+}
 }
 .fab.is-open {
   background: var(--accent);
@@ -549,9 +561,13 @@ kbd {
   background: rgba(59, 130, 246, 0.4);
   cursor: pointer;
 }
-.timeline-moment:hover,
 .timeline-moment.is-active {
   background: rgba(59, 130, 246, 0.85);
+}
+@media (hover: hover) {
+.timeline-moment:hover {
+  background: rgba(59, 130, 246, 0.85);
+}
 }
 .timeline-drawing {
   position: absolute;
@@ -579,9 +595,11 @@ kbd {
   border-radius: 2px;
   overflow: hidden;
 }
+@media (hover: hover) {
 .timeline-scrub:hover .timeline-track {
   top: 6px;
   height: 6px;
+}
 }
 .timeline-played {
   height: 100%;
@@ -779,9 +797,11 @@ kbd {
     border-color 0.12s,
     background 0.12s;
 }
+@media (hover: hover) {
 .moment:hover {
   border-color: var(--line-2);
   background: var(--bg-3);
+}
 }
 .moment.is-active {
   box-shadow: inset 3px 0 0 var(--accent);
@@ -815,9 +835,13 @@ kbd {
   opacity: 0;
   transition: opacity 0.12s;
 }
-.moment:hover .moment-actions,
 .moment.is-editing .moment-actions {
   opacity: 1;
+}
+@media (hover: hover) {
+.moment:hover .moment-actions {
+  opacity: 1;
+}
 }
 .moment-actions .btn {
   min-width: 26px;
@@ -1125,8 +1149,10 @@ kbd {
   cursor: pointer;
   white-space: nowrap;
 }
+@media (hover: hover) {
 .video-tab:hover:not(:disabled) {
   color: var(--text);
+}
 }
 .video-tab.is-active {
   color: var(--text);

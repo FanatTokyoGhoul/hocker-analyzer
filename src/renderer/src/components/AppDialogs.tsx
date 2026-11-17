@@ -41,6 +41,8 @@ type Props = {
   tagFilter: string | null
   onExport(scope: ExportScope, options: ExportOptions): void
   onColor(color: string): void
+  /** Телефон: настройки без пунктов для компьютера. */
+  mobile?: boolean
 }
 
 /** Модальные окна приложения: настройки, статистика, экспорт, видео проекта, схема момента и свободные схемы. */
@@ -62,6 +64,7 @@ export function AppDialogs(p: Props): React.JSX.Element | null {
             p.onOptimize()
           }}
           onClose={onClose}
+          mobile={p.mobile}
         />
       )
     case 'stats':
@@ -123,7 +126,7 @@ export function AppDialogs(p: Props): React.JSX.Element | null {
       ) : null
     }
     case 'vk':
-      return <VkDialog confirmDiscard={p.confirmDiscard} onOpened={p.onOpenDownloaded} onClose={onClose} />
+      return <VkDialog confirmDiscard={p.confirmDiscard} onOpened={p.onOpenDownloaded} onClose={onClose} mobile={p.mobile} />
     case 'boards':
       return (
         <BoardsDialog

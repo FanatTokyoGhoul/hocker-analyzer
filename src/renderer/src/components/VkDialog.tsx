@@ -11,6 +11,8 @@ type Props = {
   confirmDiscard(): Promise<boolean>
   onOpened(v: VideoInfo): void
   onClose(): void
+  /** Телефон: файл лежит в папке приложения, а не в «Видео/Hockey Analyzer». */
+  mobile?: boolean
 }
 
 const PHASES: Record<DownloadProgress['phase'], string> = {
@@ -33,7 +35,7 @@ export function progressDetails(p: DownloadProgress): string {
 }
 
 /** Четвёртый способ открыть видео: по ссылке на VK или VK Видео — скачивание с полосой прогресса. */
-export function VkDialog({ confirmDiscard, onOpened, onClose }: Props): React.JSX.Element {
+export function VkDialog({ confirmDiscard, onOpened, onClose, mobile }: Props): React.JSX.Element {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<DownloadProgress | null>(null)
@@ -85,8 +87,9 @@ export function VkDialog({ confirmDiscard, onOpened, onClose }: Props): React.JS
         </label>
         {text.trim() && !url && <p className="warn-text small">Нужна ссылка на видео: vk.com/video…, vkvideo.ru/video… или ссылка из «Поделиться».</p>}
         <p className="muted small">
-          Видео сохранится в папку «Видео/Hockey Analyzer» и сразу откроется. Нужен интернет; приватные видео и видео только для участников сообщества скачать
-          нельзя.
+          {mobile
+            ? 'Видео сохранится в папку приложения и сразу откроется. Нужен интернет; приватные видео и видео только для участников сообщества скачать нельзя.'
+            : 'Видео сохранится в папку «Видео/Hockey Analyzer» и сразу откроется. Нужен интернет; приватные видео и видео только для участников сообщества скачать нельзя.'}
         </p>
       </section>
 
