@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron'
 import { readFile, rename, stat, unlink, writeFile } from 'fs/promises'
-import { basename, dirname, extname, join, resolve } from 'path'
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import type { OpenedProject, Project, Recovery, VideoInfo } from '../shared/types'
 import { parseProject, serializeProject } from '../shared/project'
 import { FFMPEG, cancelConvert, convert, convertedPathFor, probe } from './ffmpeg'
@@ -55,7 +55,8 @@ async function isSafeVideoPath(p: string): Promise<boolean> {
 async function locateVideos(project: Project, projectDir: string | null): Promise<string[]> {
   const missing: string[] = []
   for (const v of project.videos) {
-    if (isNetworkPath(v.path) || !(await isSafeVideoPath(resolve(v.path)))) {
+    // имя без папки (проект с телефона) ищем только рядом с проектом, а не в рабочей папке программы
+    if (isNetworkPath(v.path) || !isAbsolute(v.path) || !(await isSafeVideoPath(resolve(v.path)))) {
       const sibling = projectDir ? join(projectDir, basename(v.path.replace(/\\/g, '/'))) : null
       if (sibling && (await isSafeVideoPath(sibling))) v.path = sibling
       else {
