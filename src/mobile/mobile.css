@@ -1,0 +1,616 @@
+/* Телефон: поверх стилей компьютерной версии (styles.css). Палец — крупные кнопки, без наведения и клавиш. */
+
+:root {
+  /* вырез экрана и системные панели Android (edge-to-edge); --safe-area-inset-* подставляет Capacitor SystemBars */
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --tap: 44px;
+}
+
+html,
+body,
+#root {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  font-size: 14px;
+}
+
+.btn {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+.icon-btn {
+  min-width: var(--tap);
+}
+/* подсказок с клавишами на телефоне нет */
+kbd,
+.draw-note {
+  display: none;
+}
+/* наведения нет: действия у момента видны всегда */
+.moment-actions {
+  opacity: 1;
+}
+.moment-actions .btn {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* ---------- каркас ---------- */
+
+.m-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+}
+
+.m-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 48px;
+  padding: 0 4px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.m-bar-btn {
+  width: var(--tap);
+  height: var(--tap);
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 20px;
+}
+.m-bar-btn:disabled {
+  opacity: 0.35;
+}
+.m-bar-btn:active:not(:disabled) {
+  background: var(--bg-4);
+}
+.m-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.m-dirty {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: none;
+}
+
+.m-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.4);
+}
+.m-menu {
+  position: absolute;
+  top: calc(var(--safe-top) + 52px);
+  left: calc(var(--safe-left) + 8px);
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  /* пункты влезают не всегда — меню скроллится до нижней кромки экрана */
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 60px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.m-menu hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+}
+.m-menu-item {
+  text-align: left;
+  padding: 13px 14px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.m-menu-item:active:not(:disabled) {
+  background: var(--bg-4);
+}
+.m-menu-item:disabled {
+  opacity: 0.4;
+}
+
+.m-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* портрет: видео 16:9 сверху, ниже управление и панель разметки */
+.m-viewer {
+  flex: none;
+}
+.m-viewer .stage {
+  flex: none;
+  aspect-ratio: 16 / 9;
+  max-height: 46vh;
+}
+.m-controls {
+  padding: 4px 8px 6px;
+}
+.m-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-2);
+  padding-bottom: var(--safe-bottom);
+}
+.m-panel .panel {
+  width: auto;
+  border-left: none;
+  min-height: 100%;
+}
+/* список прокручивается вместе с панелью, а не своей полосой */
+.m-panel .moment-list {
+  overflow: visible;
+  flex: none;
+}
+
+/* ---------- видео и рисование ---------- */
+
+/* браузер не прокручивает и не масштабирует страницу пальцем по кадру: жесты — наши (рисование, щипок) */
+.stage-frame,
+.drawing-layer,
+.board-frame {
+  touch-action: none;
+}
+.fab-stack {
+  top: 8px;
+  right: 8px;
+}
+.fab {
+  width: 46px;
+  height: 46px;
+}
+.draw-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.draw-panel {
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+.draw-tools {
+  grid-template-columns: repeat(3, 1fr);
+}
+.swatch {
+  width: 30px;
+  height: 30px;
+}
+.m-tool-done {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 5;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+}
+.shape-delete {
+  position: absolute;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  font-size: 16px;
+}
+.stage-hint {
+  max-width: calc(100% - 120px);
+  white-space: normal;
+  text-align: center;
+  font-size: 12px;
+}
+.banner {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.empty {
+  padding: 0 16px;
+}
+.empty p {
+  font-size: 13px;
+}
+.empty-actions {
+  flex-wrap: wrap;
+}
+.moment-caption {
+  font-size: 12px;
+}
+
+/* ---------- управление ---------- */
+
+.m-transport {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.m-transport-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.m-transport-row .btn {
+  min-height: var(--tap);
+  font-size: 13px;
+}
+.m-big {
+  flex: 1;
+  font-size: 16px;
+}
+.m-play {
+  flex: 1.4;
+}
+.m-play .btn-play-icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.m-time {
+  font-size: 13px;
+}
+.m-transport .segmented .btn {
+  min-height: 34px;
+  padding: 4px 8px;
+}
+.m-tr-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+/* развернуть/свернуть — как в YouTube, в правом углу управления */
+.m-fs-toggle {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: 34px;
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  padding: 0;
+}
+.m-app.is-fullscreen .m-fs-toggle {
+  color: #fff;
+}
+/* таймлайн — толще, чтобы попадать пальцем */
+.m-controls .timeline {
+  padding: 6px 0;
+}
+
+/* ---------- панель разметки ---------- */
+
+.quick-grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.quick-btn {
+  min-height: 52px;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+.draft input,
+.moment-edit input,
+.moment-edit textarea {
+  font-size: 16px; /* меньше 16px — Android масштабирует страницу при вводе */
+}
+.time-input {
+  width: 96px;
+}
+
+/* ---------- окна: во весь экран ---------- */
+
+.modal-backdrop {
+  align-items: stretch;
+}
+.modal,
+.board-modal {
+  width: 100vw;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+/* плашка окна — не липкая: уезжает вверх вместе с контентом, а не висит вечно */
+.modal-head {
+  position: static;
+}
+.settings-section {
+  padding: 12px 16px;
+}
+.board-toolbar,
+.boards-tabs,
+.boards-head,
+.board-actions {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.board-canvas {
+  padding: 10px 8px;
+}
+/* инструменты схемы — в несколько строк, а не за край экрана */
+.board-toolbar .segmented {
+  flex-wrap: wrap;
+  width: 100%;
+}
+.board-toolbar .segmented .btn {
+  flex: 1 1 30%;
+}
+.board-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* подсказка про Ctrl+Z и Delete — для клавиатуры */
+.board-actions > span {
+  display: none;
+}
+.toast {
+  bottom: calc(var(--safe-bottom) + 18px);
+  max-width: 88%;
+  text-align: center;
+}
+
+/* ---------- ландшафт: видео на весь верхний экран, панель моментов — под управлением, скроллится вниз ---------- */
+
+@media (orientation: landscape) {
+  /* шапка — узкая полоса слева: меню, отмена, сохранение под рукой, видео — во всю высоту */
+  .m-app {
+    flex-direction: row;
+    padding-top: 0;
+    padding-bottom: 0; /* нижнюю зону закрывают панели: .m-bar и .m-controls сами берут safe-bottom */
+  }
+  .m-bar {
+    flex-direction: column;
+    align-items: center;
+    width: 52px;
+    height: auto;
+    padding: 4px 0;
+    padding-top: calc(4px + var(--safe-top));
+    padding-bottom: calc(4px + var(--safe-bottom));
+    border-bottom: none;
+    border-right: 1px solid var(--line);
+  }
+  .m-title {
+    display: none;
+  }
+  /* меню — из верхнего угла, сразу за рейкой; в низком экране скроллится */
+  .m-menu {
+    top: calc(var(--safe-top) + 4px);
+    left: calc(var(--safe-left) + 60px);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);
+  }
+  .m-workspace {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    overflow-y: auto;
+  }
+  .m-viewer {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-1);
+  }
+  .m-viewer .video-bar {
+    flex: none;
+    min-height: 0;
+  }
+  .m-viewer .stage {
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: auto;
+    max-height: none;
+  }
+  /* управление — однаcompact-строка внизу, карман выреза учтён */
+  .m-controls {
+    flex: none;
+    padding: 2px 8px calc(2px + var(--safe-bottom));
+  }
+  .m-controls .timeline {
+    padding: 2px 0;
+  }
+  .m-transport {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .m-transport-row {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+  .m-transport-row .btn {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .m-transport .segmented .btn {
+    min-height: 30px;
+  }
+  /* панель моментов — как в портрете: под управлением, долистывается вниз; кнопка-шторка не нужна */
+  .m-panel {
+    flex: none;
+    border-top: 1px solid var(--line);
+    padding-bottom: calc(8px + var(--safe-bottom));
+  }
+  /* меню рисования — влезает в низкий экран целиком, скроллится внутри */
+  .draw-panel {
+    width: min(280px, calc(100vw - 120px));
+    max-height: calc(100vh - var(--safe-top) - var(--safe-bottom) - 24px);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
+  }
+  .fab-stack {
+    top: calc(var(--safe-top) + 6px);
+  }
+  /* окна: нижняя и боковые зоны выреза не режут кнопки */
+  .modal,
+  .board-modal {
+    padding-left: max(16px, var(--safe-left));
+    padding-right: max(16px, var(--safe-right));
+    padding-bottom: calc(12px + var(--safe-bottom));
+  }
+  /* быстрая разметка — в две плотные строки, панель низкая */
+  .m-panel .quick-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  .m-panel .quick-btn {
+    min-height: 40px;
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 400px) {
+  /* от совсем низких экранов (телефоны 20:9 в ландшафте): транспорт в один ряд, timeline потоньше */
+  .m-transport-row {
+    flex: 1 1 100%;
+  }
+  .m-transport-row .btn {
+    min-height: 34px;
+  }
+}
+
+/* ---------- полный экран, как в YouTube: одно видео, тап по кадру — управление ---------- */
+
+/* WebView разворачивает .m-app: системные панели скрыты, отступы под вырез не нужны */
+.m-app.is-fullscreen {
+  --safe-top: 0px;
+  --safe-right: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+  position: relative;
+}
+.m-app.is-fullscreen .m-workspace {
+  display: flex;
+  overflow: hidden;
+}
+.m-app.is-fullscreen .m-viewer {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.m-app.is-fullscreen .m-bar,
+.m-app.is-fullscreen .video-bar,
+.m-app.is-fullscreen .m-panel {
+  display: none;
+}
+/* видео — на весь экран, вокруг только чёрные поля */
+.m-app.is-fullscreen .m-viewer .stage {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+}
+/* панель управления поверх видео, появляется по тапу и гаснет сама при воспроизведении */
+.m-app.is-fullscreen .m-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  pointer-events: auto;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.m-fs-bar {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), transparent);
+  padding: 4px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.m-fs-moments {
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(15, 18, 22, 0.55);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+.m-app.is-fullscreen.is-chrome-hidden .m-controls,
+.m-app.is-fullscreen.is-chrome-hidden .m-fs-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+.m-app.is-fullscreen.is-chrome-hidden .m-controls {
+  transform: translateY(6px);
+}
+/* панель инструментов рисования — целиком в кадре: отступ сверху (кнопка ✎) + поля снизу */
+.m-app.is-fullscreen .draw-panel {
+  width: min(280px, calc(100vw - 120px));
+  max-height: calc(100dvh - 78px);
+}
+/* меню рисования — поверх оверлея управления, иначе нижние кнопки панели недостижимы */
+.m-app.is-fullscreen .fab-stack,
+.m-app.is-fullscreen .m-tool-done {
+  z-index: 9;
+}
+/* окна (схемы, настройки…) — поверх видео, тоже внутри экрана */
+.m-app.is-fullscreen .modal,
+.m-app.is-fullscreen .board-modal {
+  padding-left: max(12px, var(--safe-left));
+  padding-right: max(12px, var(--safe-right));
+  padding-bottom: 12px;
+}
