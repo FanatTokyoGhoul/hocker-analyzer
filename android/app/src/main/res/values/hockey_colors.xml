@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- фон приложения (переменная bg в styles.css): под строкой состояния и навигацией -->
+    <color name="hockey_bg">#0F1216</color>
+</resources>

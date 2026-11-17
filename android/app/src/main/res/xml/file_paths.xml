@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- «Отправить на компьютер» делится файлом проекта из кэша приложения; больше ничего не отдаём -->
+    <cache-path name="my_cache_images" path="." />
+    <!-- видео, скачанные из VK: своя папка приложения, доступ к ней и так только у нас -->
+    <external-files-path name="vk_videos" path="VK" />
+</paths>
