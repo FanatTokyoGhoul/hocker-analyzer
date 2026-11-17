@@ -1,0 +1,19 @@
+{
+  "name": "hockey-native",
+  "version": "1.0.0",
+  "description": "Нативные модули Hockey Analyzer для iOS: выбор файлов (HockeyFiles) и скачивание видео из VK (HockeyVk). Android-реализация живёт в android/app.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["ios/Sources", "Package.swift", "dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}
