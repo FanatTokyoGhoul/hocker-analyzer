@@ -254,6 +254,33 @@ export default function App(): React.JSX.Element {
     [project, activeMoment, visibleMoments, moments, projectPath, tagFilter, exporter]
   )
 
+  /** Быстрый ⬇ в ряду момента: тот же экспорт, что в диалоге для «текущего момента», но без открытия диалога. */
+  const quickClip = useRef<string | null>(null)
+  const exportOne = useCallback(
+    (m: Moment) => {
+      if (!project || exporter.busy) return
+      video?.pause()
+      quickClip.current = m.id
+      void exporter.run([m], { mode: 'single', holdSeconds: settings.holdSeconds, captions: true, boards: true }, m.title)
+    },
+    [project, exporter, video, settings.holdSeconds]
+  )
+  // результат и ошибки рядового экспорта приходят через тот же exporter — показываем тостом, окно не открываем
+  useEffect(() => {
+    if (!quickClip.current) return
+    if (exporter.error) {
+      quickClip.current = null
+      notify(`Не удалось сохранить клип: ${exporter.error}`)
+      exporter.reset()
+    } else if (exporter.result) {
+      quickClip.current = null
+      notify(`Клип сохранён: ${fileName(exporter.result[0])}`)
+      exporter.reset()
+    } else if (!exporter.busy) {
+      quickClip.current = null // диалог сохранения закрыли без выбора
+    }
+  }, [quickClip, exporter, notify])
+
   // ---------- пульт с телефона ----------
 
   const frameKey = remoteFrameKey(activeId, info?.path, drawing.frame)
@@ -521,6 +548,8 @@ export default function App(): React.JSX.Element {
           onSetBoundToNow={setBoundToNow}
           onDelete={deleteMoment}
           onBoard={openBoard}
+          onExportOne={exportOne}
+          exportingId={quickClip.current}
           quickTags={settings.quickTags}
           onQuickTag={quickTag}
           onConfigureQuickTags={openSettings}
