@@ -33,3 +33,71 @@ jobs:
             dist/*.dmg
             dist/*.AppImage
             dist/*.deb
+
+  # APK: релизный ключ разворачивается из секретов, versionName/versionCode берутся из package.json
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Android SDK (platform 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null
+      - run: npm ci
+      - run: npm run build:mobile
+      - run: npx cap sync android
+      - name: Развернуть ключ подписи
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Секрет ANDROID_KEYSTORE_BASE64 не задан — релизный APK не соберётся"; exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/hockey-release.jks
+          printf 'storeFile=../hockey-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
+      - name: Собрать APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hockey-analyzer-android
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+  # релиз собираем из артефактов всех платформ; по workflow_dispatch релиз не создаём
+  release:
+    needs: [dist, android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: hockey-analyzer-*
+          merge-multiple: false
+      - name: Привести имена к виду HockeyAnalyzer-<версия>-<платформа>
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          mv artifacts/hockey-analyzer-android/app-release.apk "artifacts/HockeyAnalyzer-$V-android.apk"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/HockeyAnalyzer-*-android.apk
+            artifacts/hockey-analyzer-ubuntu-latest/*
+            artifacts/hockey-analyzer-windows-latest/*
+            artifacts/hockey-analyzer-macos-latest/*
+          body: |
+            Десктоп: Windows (`.exe`), Linux (`.AppImage`, `.deb`), macOS (`.dmg`).
+            Телефон: Android APK (подписан релизным ключом, версия = номеру тега).
+            Лицензия — MIT.
