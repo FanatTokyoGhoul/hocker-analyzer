@@ -14,6 +14,9 @@ type Props = {
   onToggleFullscreen?: () => void
 }
 
+/** Кнопки скорости под палец: дроби короче, чтобы ряд влеза в портрет. */
+const RATE_LABEL: Record<number, string> = { 0.25: '×¼', 0.5: '×½', 0.75: '×¾', 1: '×1', 1.5: '×1.5', 2: '×2' }
+
 /** Управление под палец: крупные кнопки кадра и паузы, скорость одним нажатием. */
 export function MobileTransport(p: Props): React.JSX.Element {
   const { clock, stepMs } = p
@@ -47,7 +50,7 @@ export function MobileTransport(p: Props): React.JSX.Element {
           <div className="segmented">
             {SPEED_PRESETS.map((r) => (
               <Btn key={r} active={Math.abs(clock.rate - r) < 0.001} onClick={() => p.onRate(r)} aria-label={`Скорость ×${r}`}>
-                ×{r}
+                {RATE_LABEL[r] ?? `×${r}`}
               </Btn>
             ))}
           </div>

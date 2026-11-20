@@ -61,7 +61,7 @@ export function Transport(p: Props): React.JSX.Element {
           step={0.05}
           value={clock.rate}
           onChange={(e) => p.onRate(Number(e.target.value))}
-          title="Замедление 0.1–1"
+          title="Скорость 0.1–2"
           aria-label="Скорость"
         />
         <span className="mono speed-value">×{clock.rate.toFixed(2)}</span>

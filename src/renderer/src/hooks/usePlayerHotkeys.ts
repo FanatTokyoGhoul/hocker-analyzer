@@ -83,6 +83,8 @@ export function usePlayerHotkeys(a: PlayerHotkeys): void {
       case 'Digit2':
       case 'Digit3':
       case 'Digit4':
+      case 'Digit5':
+      case 'Digit6':
         return a.setRate(SPEED_PRESETS[Number(e.code.slice(-1)) - 1])
     }
     if (TOOL_KEYS[e.code]) return a.setTool(TOOL_KEYS[e.code])

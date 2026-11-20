@@ -1,6 +1,6 @@
-export const SPEED_PRESETS = [0.25, 0.5, 0.75, 1] as const
+export const SPEED_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const
 export const MIN_RATE = 0.1
-export const MAX_RATE = 1
+export const MAX_RATE = 2
 
 export function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v))

@@ -26,9 +26,10 @@ describe('шаг по кадрам', () => {
 })
 
 describe('скорость', () => {
-  it('держится в пределах 0.1–1', () => {
+  it('держится в пределах 0.1–2', () => {
     expect(clampRate(0.01)).toBe(0.1)
-    expect(clampRate(2)).toBe(1)
+    expect(clampRate(2)).toBe(2)
+    expect(clampRate(4)).toBe(2)
     expect(clampRate(0.333)).toBe(0.33)
   })
 })
