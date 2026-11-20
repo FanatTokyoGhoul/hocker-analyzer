@@ -128,8 +128,8 @@ describe('сервер пульта', () => {
     // токен в адресе для команд не годится — только заголовок
     const viaQuery = await fetch(`${base}/api/command?t=${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"type":"togglePlay"}' })
     expect(viaQuery.status).toBe(401)
-    const statuses: number[] = []
-    for (let i = 0; i < 40; i++) statuses.push((await post(base, token, '{"type":"togglePlay"}')).status)
+    // пачкой параллельно: бакет (30) не успевает долиться за время цикла на любом железе
+    const statuses = (await Promise.all(Array.from({ length: 40 }, () => post(base, token, '{"type":"togglePlay"}')))).map((r) => r.status)
     expect(statuses).toContain(429)
     expect(onCommand.mock.calls.length).toBeLessThanOrEqual(31)
   })
