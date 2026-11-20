@@ -183,9 +183,11 @@ kbd,
 .board-frame {
   touch-action: none;
 }
+/* попап рисования не должен вылезать за кадр: колонка ограничена высотой стадии */
 .fab-stack {
   top: 8px;
   right: 8px;
+  bottom: 8px;
 }
 .fab {
   width: 46px;
@@ -195,10 +197,12 @@ kbd,
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 .draw-panel {
   width: min(300px, calc(100vw - 32px));
-  max-height: calc(100vh - 140px);
+  min-height: 0;
   overflow-y: auto;
 }
 .draw-tools {
