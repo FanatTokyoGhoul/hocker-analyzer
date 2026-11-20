@@ -38,6 +38,8 @@ export type RemoteDeps = {
   onStatus(info: RemoteInfo): void
   /** Снимок кадра только из видео, которые пользователь сам открыл. */
   isAllowedMedia(path: string): boolean
+  /** Часы для token bucket; тестам нужен фиктивный ход времени, чтобы лимит не зависел от скорости железа. */
+  now?: () => number
 }
 
 /** Частная сеть (RFC 1918), link-local или сам компьютер — телефоны приходят только отсюда. */
@@ -89,6 +91,7 @@ let frameCache: { key: string; frameKey: string; child: ChildProcess; jpeg: Prom
 let pairedIp: string | null = null
 let lastActivity = 0
 let bucket = { tokens: COMMANDS_PER_SECOND, at: 0 }
+let clock: () => number = Date.now
 
 function info(): RemoteInfo {
   const port = server?.address()
@@ -140,7 +143,7 @@ function pushState(): void {
 }
 
 /** Ограничение частоты команд (token bucket). */
-function takeCommandToken(now = Date.now()): boolean {
+function takeCommandToken(now = clock()): boolean {
   bucket.tokens = Math.min(COMMANDS_PER_SECOND, bucket.tokens + ((now - bucket.at) / 1000) * COMMANDS_PER_SECOND)
   bucket.at = now
   if (bucket.tokens < 1) return false
@@ -301,8 +304,9 @@ export async function startRemote(d: RemoteDeps): Promise<RemoteInfo> {
   s.on('error', (e) => console.error('Пульт:', e))
   server = s
   pairedIp = null
+  clock = d.now ?? Date.now
   lastActivity = Date.now()
-  bucket = { tokens: COMMANDS_PER_SECOND, at: Date.now() }
+  bucket = { tokens: COMMANDS_PER_SECOND, at: clock() }
   stateTimer = setInterval(() => {
     pushState()
     if (clients.size === 0 && Date.now() - lastActivity > IDLE_STOP_MS) {
@@ -322,6 +326,7 @@ export function stopRemote(): void {
   server?.closeAllConnections()
   server = null
   token = ''
+  clock = Date.now
   sentJson = ''
   frameCache?.child.kill('SIGKILL')
   frameCache = null

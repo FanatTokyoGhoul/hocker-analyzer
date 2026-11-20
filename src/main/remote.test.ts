@@ -20,10 +20,10 @@ beforeAll(() => {
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
 /** Сервер на всех интерфейсах; ходим через 127.0.0.1 — он есть и там, где нет сети. */
-async function start(allowed: (p: string) => boolean = () => false) {
+async function start(allowed: (p: string) => boolean = () => false, now?: () => number) {
   const onCommand = vi.fn()
   const onStatus = vi.fn()
-  const info = await startRemote({ onCommand, onStatus, isAllowedMedia: allowed })
+  const info = await startRemote({ onCommand, onStatus, isAllowedMedia: allowed, now })
   const { port, token } = remoteEndpoint()!
   return { info, port, token, base: `http://127.0.0.1:${port}`, onCommand, onStatus }
 }
@@ -117,7 +117,9 @@ describe('сервер пульта', () => {
   })
 
   it('привязка к первому устройству, только JSON, ограничение частоты', async () => {
-    const { port, token, base, onCommand, onStatus } = await start()
+    // время стоит на месте: лимит проверяем без гонки с реальными часами (на CI они «медленные»)
+    let t = 1_700_000_000_000
+    const { port, token, base, onCommand, onStatus } = await start(() => false, () => t)
     expect(await raw(port, `/?t=${token}`, { localAddress: '127.0.0.1' })).toBe(200)
     expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ device: '127.0.0.1' }))
     // другое устройство с той же ссылкой не пускаем
@@ -128,10 +130,14 @@ describe('сервер пульта', () => {
     // токен в адресе для команд не годится — только заголовок
     const viaQuery = await fetch(`${base}/api/command?t=${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"type":"togglePlay"}' })
     expect(viaQuery.status).toBe(401)
-    // пачкой параллельно: бакет (30) не успевает долиться за время цикла на любом железе
     const statuses = (await Promise.all(Array.from({ length: 40 }, () => post(base, token, '{"type":"togglePlay"}')))).map((r) => r.status)
-    expect(statuses).toContain(429)
-    expect(onCommand.mock.calls.length).toBeLessThanOrEqual(31)
+    // бакет на 30 команд в секунду: из 40 instantaneous прошли ровно 30
+    expect(statuses.filter((s) => s === 204)).toHaveLength(30)
+    expect(statuses.filter((s) => s === 429)).toHaveLength(10)
+    expect(onCommand.mock.calls.length).toBe(30)
+    // прошла секунда — долито 30 токенов, снова пропускаем
+    t += 1000
+    expect((await post(base, token, '{"type":"togglePlay"}')).status).toBe(204)
   })
 
   it('после выключения старый токен не работает, при включении — новый', async () => {
