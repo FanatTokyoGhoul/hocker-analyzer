@@ -15,6 +15,8 @@ export interface HockeyFilesPlugin {
   pickProject(): Promise<Picked & { text?: string; writable?: boolean }>
   createDocument(options: { name: string; text: string }): Promise<Picked>
   writeDocument(options: { uri: string; text: string }): Promise<void>
+  /** Записать mp4 в выбранный пользователем файл (Android). base64 — весь клип. */
+  saveVideo(options: { name: string; base64: string }): Promise<Picked>
 }
 
 export const HockeyFiles = registerPlugin<HockeyFilesPlugin>('HockeyFiles')

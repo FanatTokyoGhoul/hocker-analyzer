@@ -35,6 +35,10 @@ type Props = {
   quickTags: QuickTag[]
   onQuickTag(t: QuickTag): void
   onConfigureQuickTags(): void
+  /** Кнопка «сохранить момент в MP4» в ряду; нет функции — нет и кнопки (телефон без записи). */
+  onExportOne?(m: Moment): void
+  /** Иди момента, который сейчас пишется — ряд показывает ⏺, кнопки заняты. */
+  exportingId?: string | null
 }
 
 export type MomentPatch = Partial<Pick<Moment, 'title' | 'start' | 'end' | 'tags' | 'notes'>>
@@ -44,9 +48,23 @@ type RowProps = {
   index: number
   active: boolean
   playing: boolean
-} & Pick<Props, 'onSelect' | 'onPlayOne' | 'onUpdate' | 'onSetBoundToNow' | 'onDelete' | 'onBoard'>
+} & Pick<Props, 'onSelect' | 'onPlayOne' | 'onUpdate' | 'onSetBoundToNow' | 'onDelete' | 'onBoard' | 'onExportOne'> &
+  Pick<Props, 'exportingId'>
 
-const MomentRow = memo(function MomentRow({ m, index, active, playing, onSelect, onPlayOne, onUpdate, onSetBoundToNow, onDelete, onBoard }: RowProps): React.JSX.Element {
+const MomentRow = memo(function MomentRow({
+  m,
+  index,
+  active,
+  playing,
+  onSelect,
+  onPlayOne,
+  onUpdate,
+  onSetBoundToNow,
+  onDelete,
+  onBoard,
+  onExportOne,
+  exportingId
+}: RowProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const drawings = (m.drawings ?? []).reduce((n, d) => n + d.shapes.length, 0)
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
@@ -71,6 +89,18 @@ const MomentRow = memo(function MomentRow({ m, index, active, playing, onSelect,
           <Btn variant="ghost" className="icon-btn" title="Проиграть этот момент" aria-label="Проиграть" onClick={() => onPlayOne(m)}>
             ▶
           </Btn>
+          {onExportOne && (
+            <Btn
+              variant="ghost"
+              className="icon-btn"
+              title="Сохранить момент в MP4"
+              aria-label="Сохранить клип"
+              disabled={!!exportingId}
+              onClick={() => onExportOne(m)}
+            >
+              {exportingId === m.id ? '⏺' : '⬇'}
+            </Btn>
+          )}
           <Btn
             variant="ghost"
             className="icon-btn"
@@ -245,6 +275,8 @@ export const MomentsPanel = memo(function MomentsPanel(p: Props): React.JSX.Elem
                 onSetBoundToNow={p.onSetBoundToNow}
                 onDelete={p.onDelete}
                 onBoard={p.onBoard}
+                onExportOne={p.onExportOne}
+                exportingId={p.exportingId ?? null}
               />
             ))}
           </ul>

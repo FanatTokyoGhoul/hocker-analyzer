@@ -33,7 +33,8 @@ import { NO_ZOOM, type ZoomView } from '../renderer/src/lib/geometry'
 import { drawingVideoId, initialProjectState, projectReducer, redoLabel, undoLabel } from '../renderer/src/lib/projectState'
 import { locateMoment } from '../renderer/src/lib/videos'
 import { displayName, shareProject } from './mobileApi'
-import { isIOS } from './native'
+import { HockeyFiles, isIOS } from './native'
+import { ClipAbort, blobToBase64, canRecordClip, clipFileName, recordClip } from './clipExport'
 import { MobileTransport } from './MobileTransport'
 
 type FloatingMenu = 'draw' | 'main' | null
@@ -225,6 +226,37 @@ export default function MobileApp(): React.JSX.Element {
     }
   }, [project, projectForDisk, notify])
 
+  // ---------- момент в MP4 (переписываем отрезок прямо на телефоне) ----------
+
+  const [clip, setClip] = useState<{ id: string; ratio: number; phase: 'rec' | 'save' } | null>(null)
+  const clipCtrl = useRef<AbortController | null>(null)
+  const canClip = !isIOS && canRecordClip()
+
+  const exportOne = useCallback(
+    async (m: Moment) => {
+      if (!video || !project || clip) return
+      const v = locateMoment(playable, m, activeId)
+      if (v && v.id !== activeId) return notify('Сначала откройте видео этого момента')
+      const ctrl = new AbortController()
+      clipCtrl.current = ctrl
+      setClip({ id: m.id, ratio: 0, phase: 'rec' })
+      stopPlaylist()
+      try {
+        const blob = await recordClip(video, m.start - offset, Math.min(m.end - offset, duration - 0.05), (r) => setClip((c) => (c ? { ...c, ratio: r } : c)), ctrl.signal)
+        setClip((c) => (c ? { ...c, phase: 'save' } : c))
+        const saved = await HockeyFiles.saveVideo({ name: clipFileName(projectName ?? 'момент', m.start), base64: await blobToBase64(blob) })
+        if (saved.uri) notify(`Клип сохранён: ${saved.name}`)
+      } catch (e) {
+        if (e instanceof ClipAbort) notify('Запись отменена')
+        else notify(`Не удалось сохранить клип: ${errorText(e)}`)
+      } finally {
+        setClip(null)
+        clipCtrl.current = null
+      }
+    },
+    [video, project, clip, playable, activeId, offset, duration, projectName, stopPlaylist, notify]
+  )
+
   const openBoard = useCallback(
     (m: Moment) => {
       freeze()
@@ -305,7 +337,7 @@ export default function MobileApp(): React.JSX.Element {
   /** Тап в полном экране — по любой точке сцены, включая чёрные поля вокруг видео. */
   const tapStart = useRef<{ x: number; y: number } | null>(null)
   const tapStage = (e: React.MouseEvent): void => {
-    if (tool !== 'none' || menu === 'draw') return
+    if (clip || tool !== 'none' || menu === 'draw') return
     const el = e.target as HTMLElement
     if (el.closest('button, a, input, textarea, select, .m-controls, .m-fs-bar, .banner, .draw-menu')) return
     const start = tapStart.current
@@ -403,7 +435,7 @@ export default function MobileApp(): React.JSX.Element {
             onDrawStart={freeze}
             onDropFile={() => undefined}
             onVideoError={sources.reportPlaybackError}
-            onClickVideo={fullscreen ? () => {} : togglePlay}
+            onClickVideo={fullscreen || clip ? () => {} : togglePlay}
             hint={hold || tool === 'none' ? null : drawing.hint}
             overlay={
               <StageBanner
@@ -486,6 +518,22 @@ export default function MobileApp(): React.JSX.Element {
               )
             }
           />
+          {clip && (
+            <div className="m-clip" role="status">
+              <span className="m-clip-dot" aria-hidden="true" />
+              <span className="m-clip-label">
+                {clip.phase === 'rec' ? `Записываю клип… ${Math.round(clip.ratio * 100)}%` : 'Сохраняю файл…'}
+              </span>
+              <span className="m-clip-bar" aria-hidden="true">
+                <i style={{ width: `${Math.round(clip.ratio * 100)}%` }} />
+              </span>
+              {clip.phase === 'rec' && (
+                <Btn variant="ghost" onClick={() => clipCtrl.current?.abort()}>
+                  Отменить
+                </Btn>
+              )}
+            </div>
+          )}
           <div className="controls m-controls">
             <Timeline
               duration={duration}
@@ -494,16 +542,16 @@ export default function MobileApp(): React.JSX.Element {
               draft={timelineDraft}
               activeId={activeMoment?.id ?? null}
               src={null}
-              onSeek={seek}
-              onSelectMoment={selectTimelineMoment}
+              onSeek={clip ? () => undefined : seek}
+              onSelectMoment={clip ? () => undefined : selectTimelineMoment}
             />
             <MobileTransport
               clock={clock}
               stepMs={stepMs}
-              onTogglePlay={togglePlay}
-              onStepFrame={stepFrame}
-              onStepMs={stepBy}
-              onRate={setRate}
+              onTogglePlay={clip ? () => undefined : togglePlay}
+              onStepFrame={clip ? () => undefined : stepFrame}
+              onStepMs={clip ? () => undefined : stepBy}
+              onRate={clip ? () => undefined : setRate}
               fullscreen={fullscreen}
               onToggleFullscreen={isIOS ? undefined : toggleFullscreen}
             />
@@ -533,6 +581,8 @@ export default function MobileApp(): React.JSX.Element {
             onSetBoundToNow={setBoundToNow}
             onDelete={deleteMoment}
             onBoard={openBoard}
+            onExportOne={canClip ? exportOne : undefined}
+            exportingId={clip?.id ?? null}
             quickTags={settings.quickTags}
             onQuickTag={quickTag}
             onConfigureQuickTags={openSettings}

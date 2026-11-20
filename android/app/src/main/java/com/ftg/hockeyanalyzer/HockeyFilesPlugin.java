@@ -255,6 +255,45 @@ public class HockeyFilesPlugin extends Plugin {
             .start();
     }
 
+    /** Сохранить клип момента: пользователь выбирает файл mp4, пишем байты. */
+    @PluginMethod
+    public void saveVideo(PluginCall call) {
+        String name = call.getString("name", "момент.mp4");
+        if (call.getString("base64") == null) {
+            call.reject("Нет данных");
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("video/mp4");
+        intent.putExtra(Intent.EXTRA_TITLE, name);
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        startActivityForResult(call, intent, "onVideoSaved");
+    }
+
+    @ActivityCallback
+    private void onVideoSaved(PluginCall call, ActivityResult result) {
+        Uri uri = resultUri(result);
+        if (uri == null) {
+            call.resolve(new JSObject());
+            return;
+        }
+        String data = call.getString("base64");
+        // клип — файл одноразовый, персистить разрешение смысла нет; пишем вне главного потока
+        new Thread(() -> {
+            try (OutputStream os = getContext().getContentResolver().openOutputStream(uri, "w")) {
+                os.write(android.util.Base64.decode(data, android.util.Base64.DEFAULT));
+                JSObject ret = new JSObject();
+                ret.put("uri", uri.toString());
+                ret.put("name", displayName(uri));
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Не удалось сохранить: " + e.getMessage());
+            }
+        })
+            .start();
+    }
+
     /** Перезаписать уже выбранный файл проекта. */
     @PluginMethod
     public void writeDocument(PluginCall call) {

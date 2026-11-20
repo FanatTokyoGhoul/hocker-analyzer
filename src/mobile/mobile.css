@@ -225,6 +225,44 @@ kbd,
   font: inherit;
   font-weight: 600;
 }
+/* идёт переписывание момента в mp4: видео занято записью, показываем прогресс над управлением */
+.m-clip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.m-clip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: m-clip-blink 1s infinite;
+}
+@keyframes m-clip-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.m-clip-label {
+  white-space: nowrap;
+}
+.m-clip-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.m-clip-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
 .shape-delete {
   position: absolute;
   z-index: 3;

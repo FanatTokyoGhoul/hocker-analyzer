@@ -37,7 +37,8 @@ public class HockeyFilesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "probe", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pickProject", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createDocument", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "writeDocument", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "writeDocument", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveVideo", returnType: CAPPluginReturnPromise)
     ]
 
     /** Проект больше этого — не наш файл. */
@@ -46,6 +47,7 @@ public class HockeyFilesPlugin: CAPPlugin, CAPBridgedPlugin {
     private var pendingCall: CAPPluginCall?
     private var pickerMode = ""
     private var createText = ""
+    private var createData = Data()
 
     // ---------- выбор ----------
 
@@ -65,6 +67,16 @@ public class HockeyFilesPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         createText = text
         begin(call, mode: "create", picker: UIDocumentPickerViewController(forCreatingContentTypes: [.json]))
+    }
+
+    /** Клип момента: пользователь выбирает, куда сохранить mp4, пишем байты. */
+    @objc func saveVideo(_ call: CAPPluginCall) {
+        guard let b64 = call.getString("base64"), let data = Data(base64Encoded: b64) else {
+            call.reject("Нет данных")
+            return
+        }
+        createData = data
+        begin(call, mode: "createVideo", picker: UIDocumentPickerViewController(forCreatingContentTypes: [.mpeg4Movie]))
     }
 
     private func begin(_ call: CAPPluginCall, mode: String, picker: UIDocumentPickerViewController) {
@@ -231,6 +243,17 @@ extension HockeyFilesPlugin: UIDocumentPickerDelegate {
             DispatchQueue.global().async {
                 self.writeText(url, text: self.createText) { error in
                     if let error = error { call.reject("Не удалось сохранить: \(error)") } else { call.resolve(pickedObject(url.absoluteString, url.lastPathComponent)) }
+                }
+            }
+        case "createVideo":
+            DispatchQueue.global().async {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    try self.createData.write(to: url, options: .atomic)
+                    call.resolve(pickedObject(url.absoluteString, url.lastPathComponent))
+                } catch {
+                    call.reject("Не удалось сохранить: \(error.localizedDescription)")
                 }
             }
         default:
