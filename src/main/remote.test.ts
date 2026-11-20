@@ -123,7 +123,12 @@ describe('сервер пульта', () => {
     expect(await raw(port, `/?t=${token}`, { localAddress: '127.0.0.1' })).toBe(200)
     expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ device: '127.0.0.1' }))
     // другое устройство с той же ссылкой не пускаем
-    expect(await raw(port, `/?t=${token}`, { localAddress: '127.0.0.2' })).toBe(403)
+    // на macOS вне CI алиаса lo0 127.0.0.2 может не быть — тогда пропускаем только эту проверку
+    try {
+      expect(await raw(port, `/?t=${token}`, { localAddress: '127.0.0.2' })).toBe(403)
+    } catch (e) {
+      if (!/EADDRNOTAVAIL/.test(String(e))) throw e
+    }
 
     // «простой» запрос, который браузер шлёт без preflight, не принимаем
     expect((await post(base, token, '{"type":"togglePlay"}', 'text/plain')).status).toBe(415)

@@ -20,6 +20,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # на macOS на loopback по умолчанию только 127.0.0.1, а тест пульта
+      # эмулирует второе устройство через 127.0.0.2 (на Linux/Windows работает из коробки)
+      - name: Второй loopback-адрес (macOS)
+        if: runner.os == 'macOS'
+        run: sudo ifconfig lo0 alias 127.0.0.2
       - run: npm ci
       - run: npm test
       - run: npm run dist -- --publish never
